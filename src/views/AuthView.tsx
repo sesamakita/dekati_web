@@ -31,7 +31,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
   onBackToLanding,
   initialMode = 'login',
 }) => {
-  const { profile } = useData();
+  const { profile, loginOfficial, registerOfficial } = useData();
   const [authMode, setAuthMode] = useState<'login' | 'register'>(initialMode);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -71,7 +71,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
   };
 
   // Submit Login
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
 
@@ -81,21 +81,27 @@ export const AuthView: React.FC<AuthViewProps> = ({
     }
 
     setIsSubmitting(true);
+    try {
+      const result = await loginOfficial(loginEmail, loginPassword);
+      if (result.success && result.user) {
+        const determinedRole =
+          result.user.role === 'kades' || result.user.role === 'lurah'
+            ? 'kades'
+            : 'admin_desa';
 
-    setTimeout(() => {
+        onLoginSuccess(determinedRole, result.user.email);
+      } else {
+        setLoginError(result.error || 'Email atau kata sandi tidak cocok.');
+      }
+    } catch (err: any) {
+      setLoginError(err.message || 'Terjadi kesalahan saat masuk.');
+    } finally {
       setIsSubmitting(false);
-      // Auto-detect role if email contains kades
-      const determinedRole =
-        loginEmail.toLowerCase().includes('kades') || loginRole === 'kades'
-          ? 'kades'
-          : 'admin_desa';
-
-      onLoginSuccess(determinedRole, loginEmail);
-    }, 600);
+    }
   };
 
   // Submit Register
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
 
@@ -115,18 +121,34 @@ export const AuthView: React.FC<AuthViewProps> = ({
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
+    try {
+      const result = await registerOfficial({
+        nama: regName,
+        email: regEmail,
+        password: regPassword,
+        role: regRole,
+        nik: regNik,
+        village_code: regVillageCode,
+        village_name: regVillage,
+      });
+
+      if (result.success && result.user) {
+        setRegisterSuccess(true);
+        setTimeout(() => {
+          setAuthMode('login');
+          setLoginEmail(regEmail);
+          setLoginPassword(regPassword);
+          setLoginRole(regRole === 'kades' || regRole === 'lurah' ? 'kades' : 'admin_desa');
+          setRegisterSuccess(false);
+        }, 1500);
+      } else {
+        setLoginError(result.error || 'Gagal mendaftarkan akun aparat desa.');
+      }
+    } catch (err: any) {
+      setLoginError(err.message || 'Terjadi kesalahan saat pendaftaran.');
+    } finally {
       setIsSubmitting(false);
-      setRegisterSuccess(true);
-      setTimeout(() => {
-        // Automatically switch to login with prefilled data
-        setAuthMode('login');
-        setLoginEmail(regEmail);
-        setLoginPassword(regPassword);
-        setLoginRole(regRole === 'kades' ? 'kades' : 'admin_desa');
-        setRegisterSuccess(false);
-      }, 1800);
-    }, 800);
+    }
   };
 
   return (

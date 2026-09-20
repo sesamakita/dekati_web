@@ -1,8 +1,27 @@
 // src/types/index.ts
 
-export type UserRole = 'superadmin' | 'kades' | 'admin_desa' | 'petugas_layanan' | 'ketua_rt_rw' | 'warga';
+export type UserRole = 'superadmin' | 'kades' | 'lurah' | 'admin_desa' | 'sekdes' | 'kasi_layanan' | 'kaur_keuangan' | 'kaur_pembangunan' | 'satlinmas' | 'operator' | 'petugas_layanan' | 'ketua_rt_rw' | 'warga';
 
 export type UserStatus = 'pending_verification' | 'active' | 'rejected' | 'suspended';
+
+export interface VillageOfficial {
+  id: string;
+  user_id?: string;
+  nik: string;
+  nip?: string;
+  nama_lengkap: string;
+  email: string;
+  role: 'kades' | 'lurah' | 'sekdes' | 'kasi_layanan' | 'kaur_keuangan' | 'kaur_pembangunan' | 'satlinmas' | 'operator' | 'admin_desa';
+  village_id?: number;
+  village_code: string;
+  village_name: string;
+  phone_number?: string;
+  avatar_url?: string;
+  can_sign_tte: boolean;
+  status: 'active' | 'pending_approval' | 'suspended';
+  last_login_at?: string;
+  created_at?: string;
+}
 
 export type GenderType = 'L' | 'P';
 

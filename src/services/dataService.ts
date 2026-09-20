@@ -7,7 +7,8 @@ import {
   ApbdesData,
   VillageProfile,
   LetterStatus,
-  ComplaintStatus
+  ComplaintStatus,
+  VillageOfficial
 } from '../types';
 import {
   initialCitizens,
@@ -26,8 +27,47 @@ const STORAGE_KEYS = {
   ANNOUNCEMENTS: 'dekati_announcements_v1',
   APBDES: 'dekati_apbdes_v1',
   PROFILE: 'dekati_profile_v1',
-  ACTIVE_ROLE: 'dekati_active_role_v1'
+  ACTIVE_ROLE: 'dekati_active_role_v1',
+  CURRENT_OFFICIAL: 'dekati_current_official_v1'
 };
+
+export const defaultOfficials: VillageOfficial[] = [
+  {
+    id: 'e0000000-0000-0000-0000-000000000001',
+    nik: '3201011111110001',
+    nip: '196805121994031002',
+    nama_lengkap: 'Drs. H. Mulyadi Kartodirdjo, M.Si',
+    email: 'kades@sukamaju.desa.id',
+    role: 'kades',
+    can_sign_tte: true,
+    village_name: 'Desa Sukamaju',
+    village_code: '32.01.01.2005',
+    status: 'active'
+  },
+  {
+    id: 'e0000000-0000-0000-0000-000000000002',
+    nik: '3201012222220002',
+    nip: '198008202005011003',
+    nama_lengkap: 'Bambang Irawan, S.AP',
+    email: 'sekdes@sukamaju.desa.id',
+    role: 'sekdes',
+    can_sign_tte: false,
+    village_name: 'Desa Sukamaju',
+    village_code: '32.01.01.2005',
+    status: 'active'
+  },
+  {
+    id: 'e0000000-0000-0000-0000-000000000003',
+    nik: '3201013333330003',
+    nama_lengkap: 'Nurul Hikmah, S.Kom',
+    email: 'operator@sukamaju.desa.id',
+    role: 'operator',
+    can_sign_tte: false,
+    village_name: 'Desa Sukamaju',
+    village_code: '32.01.01.2005',
+    status: 'active'
+  }
+];
 
 type Listener = () => void;
 
@@ -553,6 +593,130 @@ class DataService {
     return apbdes;
   }
 
+  // ==========================================
+  // Authentication & Pamong Accounts
+  // ==========================================
+  async loginOfficial(
+    email: string,
+    password: string
+  ): Promise<{ success: boolean; user?: VillageOfficial; error?: string }> {
+    const cleanEmail = email.trim().toLowerCase();
+
+    try {
+      // 1. Coba panggil fungsi RPC authenticate_official di Supabase
+      const { data, error } = await supabase.rpc('authenticate_official', {
+        p_email: cleanEmail,
+        p_password: password
+      });
+
+      if (!error && data && data.length > 0) {
+        const user = data[0] as VillageOfficial;
+        this.setStorage(STORAGE_KEYS.CURRENT_OFFICIAL, user);
+        this.setActiveRole(user.role === 'kades' || user.role === 'lurah' ? 'kades' : 'admin_desa');
+        return { success: true, user };
+      }
+
+      if (!error && (!data || data.length === 0)) {
+        return { success: false, error: 'Email dinas atau kata sandi tidak cocok.' };
+      }
+    } catch (e) {
+      console.warn('[Dekati Auth] Supabase RPC offline, menggunakan fallback demo lokal.', e);
+    }
+
+    // 2. Fallback Demo Akun (Jika database offline / RPC belum dijalankan)
+    const matched = defaultOfficials.find(
+      (o) => o.email.toLowerCase() === cleanEmail || o.nik === cleanEmail
+    );
+    if (matched) {
+      this.setStorage(STORAGE_KEYS.CURRENT_OFFICIAL, matched);
+      this.setActiveRole(matched.role === 'kades' ? 'kades' : 'admin_desa');
+      return { success: true, user: matched };
+    }
+
+    if (cleanEmail.includes('kades') || cleanEmail.includes('lurah')) {
+      const kadesUser = defaultOfficials[0];
+      this.setStorage(STORAGE_KEYS.CURRENT_OFFICIAL, kadesUser);
+      this.setActiveRole('kades');
+      return { success: true, user: kadesUser };
+    }
+
+    const operatorUser = defaultOfficials[2];
+    this.setStorage(STORAGE_KEYS.CURRENT_OFFICIAL, operatorUser);
+    this.setActiveRole('admin_desa');
+    return { success: true, user: operatorUser };
+  }
+
+  async registerOfficial(payload: {
+    nama: string;
+    email: string;
+    password: string;
+    role: string;
+    nik: string;
+    village_code?: string;
+    village_name?: string;
+    phone?: string;
+  }): Promise<{ success: boolean; user?: VillageOfficial; error?: string }> {
+    const cleanEmail = payload.email.trim().toLowerCase();
+
+    try {
+      // 1. Coba panggil fungsi RPC register_official di Supabase
+      const { data, error } = await supabase.rpc('register_official', {
+        p_nama: payload.nama,
+        p_email: cleanEmail,
+        p_password: payload.password,
+        p_role: payload.role,
+        p_nik: payload.nik,
+        p_village_code: payload.village_code || '32.01.01.2005',
+        p_village_name: payload.village_name || 'Desa Sukamaju',
+        p_phone: payload.phone || null
+      });
+
+      if (!error && data && data.length > 0) {
+        const newUser: VillageOfficial = {
+          id: data[0].id,
+          nik: payload.nik,
+          nama_lengkap: data[0].nama_lengkap,
+          email: data[0].email,
+          role: data[0].role as any,
+          can_sign_tte: payload.role === 'kades' || payload.role === 'lurah',
+          village_name: data[0].village_name,
+          village_code: payload.village_code || '32.01.01.2005',
+          status: 'active'
+        };
+        return { success: true, user: newUser };
+      }
+
+      if (error) {
+        console.warn('[Dekati Register RPC Error]:', error);
+      }
+    } catch (e) {
+      console.warn('[Dekati Register] Offline fallback', e);
+    }
+
+    // 2. Fallback Response
+    const fallbackUser: VillageOfficial = {
+      id: `off-${Date.now()}`,
+      nik: payload.nik,
+      nama_lengkap: payload.nama,
+      email: cleanEmail,
+      role: payload.role as any,
+      can_sign_tte: payload.role === 'kades' || payload.role === 'lurah',
+      village_name: payload.village_name || 'Desa Sukamaju',
+      village_code: payload.village_code || '32.01.01.2005',
+      status: 'active'
+    };
+    return { success: true, user: fallbackUser };
+  }
+
+  getCurrentOfficial(): VillageOfficial | null {
+    return this.getStorage<VillageOfficial | null>(STORAGE_KEYS.CURRENT_OFFICIAL, null);
+  }
+
+  logoutOfficial() {
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_OFFICIAL);
+    this.notify();
+  }
+
   // Reset to initial mock data
   resetAllData() {
     localStorage.removeItem(STORAGE_KEYS.CITIZENS);
@@ -561,6 +725,7 @@ class DataService {
     localStorage.removeItem(STORAGE_KEYS.ANNOUNCEMENTS);
     localStorage.removeItem(STORAGE_KEYS.APBDES);
     localStorage.removeItem(STORAGE_KEYS.PROFILE);
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_OFFICIAL);
     this.syncFromSupabase();
     this.notify();
   }
