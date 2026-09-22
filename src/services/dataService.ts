@@ -419,9 +419,10 @@ class DataService {
     letters[index] = letter;
     this.setStorage(STORAGE_KEYS.LETTERS, letters);
 
-    // Sync to Supabase: cocokkan id ataupun tracking_number agar tidak terjadi silent fail
+    // Sync to Supabase: cocokkan id ataupun tracking_number secara aman tipe data UUID
     try {
-      await supabase
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      let updateQuery = supabase
         .from('letter_requests')
         .update({
           status: letter.status,
@@ -433,8 +434,13 @@ class DataService {
           rejection_reason: letter.rejection_reason,
           timeline: letter.timeline,
           updated_at: new Date().toISOString()
-        })
-        .or(`id.eq.${id},tracking_number.eq.${letter.tracking_number}`);
+        });
+
+      if (isUuid) {
+        await updateQuery.or(`id.eq.${id},tracking_number.eq.${letter.tracking_number}`);
+      } else {
+        await updateQuery.eq('tracking_number', letter.tracking_number);
+      }
     } catch (e) {
       console.warn('Supabase letter update offline', e);
     }

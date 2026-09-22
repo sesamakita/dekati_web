@@ -27,6 +27,7 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
+import { supabase } from '../services/supabase';
 import { useData } from '../hooks/useData';
 import { LetterRequest } from '../types';
 import { LetterStatusBadge } from '../components/StatusBadge';
@@ -55,26 +56,52 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterAdmin }
   // State for FAQ accordion
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
-  // Handle Search in Tracking Widget
-  const handleTrackLetter = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!trackingQuery.trim()) return;
+  // Pencarian Surat Mandiri Warga (Cek memori lokal lalu fallback langsung ke Supabase Cloud)
+  const searchLetter = async (queryStr: string) => {
+    const q = queryStr.trim();
+    if (!q) return;
 
     setHasSearched(true);
     const found = letters.find(
       (l) =>
-        l.tracking_number.toLowerCase() === trackingQuery.trim().toLowerCase() ||
+        l.tracking_number.toLowerCase() === q.toLowerCase() ||
         (l.letter_official_number &&
-          l.letter_official_number.toLowerCase().includes(trackingQuery.trim().toLowerCase()))
+          l.letter_official_number.toLowerCase().includes(q.toLowerCase()))
     );
-    setTrackedLetter(found || null);
+
+    if (found) {
+      setTrackedLetter(found);
+      return;
+    }
+
+    // Direct Supabase lookup jika belum ada di memori lokal
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q);
+      let query = supabase.from('letter_requests').select('*');
+      if (isUuid) {
+        query = query.or(`id.eq.${q},tracking_number.eq.${q}`);
+      } else {
+        query = query.eq('tracking_number', q);
+      }
+      const { data } = await query.maybeSingle();
+      if (data) {
+        setTrackedLetter(data as LetterRequest);
+      } else {
+        setTrackedLetter(null);
+      }
+    } catch {
+      setTrackedLetter(null);
+    }
+  };
+
+  const handleTrackLetter = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    searchLetter(trackingQuery);
   };
 
   const handleQuickTrack = (num: string) => {
     setTrackingQuery(num);
-    setHasSearched(true);
-    const found = letters.find((l) => l.tracking_number.toLowerCase() === num.toLowerCase());
-    setTrackedLetter(found || null);
+    searchLetter(num);
   };
 
   const toggleFaq = (idx: number) => {
