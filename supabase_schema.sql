@@ -805,3 +805,57 @@ VALUES
         'active'
     )
 ON CONFLICT (email) DO NOTHING;
+
+-- ============================================================================
+-- 16. STORAGE BUCKET: DOKUMEN, BERKAS WARGA & BUKTI ADUAN
+-- ============================================================================
+-- Buat bucket penyimpanan publik bernama 'documents' jika belum ada
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+    'documents', 
+    'documents', 
+    true, 
+    10485760, -- Limit 10 MB
+    ARRAY['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- Kebijakan Akses Baca Publik (Semua user dan Web Admin dapat membaca/melihat dokumen)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'objects' AND policyname = 'Public Read Documents'
+    ) THEN
+        CREATE POLICY "Public Read Documents" 
+        ON storage.objects FOR SELECT 
+        USING (bucket_id = 'documents');
+    END IF;
+END $$;
+
+-- Kebijakan Unggah Publik (Aplikasi Mobile Warga dapat mengunggah berkas)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'objects' AND policyname = 'Public Insert Documents'
+    ) THEN
+        CREATE POLICY "Public Insert Documents" 
+        ON storage.objects FOR INSERT 
+        WITH CHECK (bucket_id = 'documents');
+    END IF;
+END $$;
+
+-- Kebijakan Perbarui / Ganti Berkas
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'objects' AND policyname = 'Public Update Documents'
+    ) THEN
+        CREATE POLICY "Public Update Documents" 
+        ON storage.objects FOR UPDATE 
+        USING (bucket_id = 'documents');
+    END IF;
+END $$;
+
