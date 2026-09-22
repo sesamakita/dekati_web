@@ -8,7 +8,9 @@ import {
   XCircle, 
   Eye, 
   CreditCard, 
-  Camera 
+  Camera,
+  FileText,
+  ExternalLink
 } from 'lucide-react';
 import { Citizen } from '../types';
 import { useData } from '../hooks/useData';
@@ -119,6 +121,33 @@ export const CitizenVerifyModal: React.FC<CitizenVerifyModalProps> = ({ citizen,
               </div>
             </div>
           </div>
+
+          {/* Dokumen Bukti Fisik / KK / Akta jika diunggah warga */}
+          {citizen.foto_kk_path && (
+            <div className="p-3.5 bg-sky-50/70 rounded-2xl border border-sky-200">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-bold text-sky-900 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-sky-600" />
+                  Berkas Fisik Lampiran (Kartu Keluarga / Akta Kelahiran / KIA)
+                </span>
+                <a
+                  href={citizen.foto_kk_path}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] font-bold text-sky-700 hover:text-sky-900 flex items-center gap-1 hover:underline"
+                >
+                  <ExternalLink className="w-3 h-3" /> Buka Penuh
+                </a>
+              </div>
+              <div className="h-44 bg-white rounded-xl overflow-hidden border border-sky-100 flex items-center justify-center">
+                <img
+                  src={citizen.foto_kk_path}
+                  alt="Dokumen KK / Akta"
+                  className="w-full h-full object-contain p-1"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Reject box */}
           {showRejectBox && (

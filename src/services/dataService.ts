@@ -477,7 +477,8 @@ class DataService {
       citizen.verified_by = 'Operator Verifikasi Desa';
     } else {
       citizen.is_verified = false;
-      citizen.verified_at = `Ditolak: ${notes || 'Dokumen KTP/KK buram'}`;
+      citizen.verified_by = `revisi: ${notes || 'Dokumen KTP/KK buram atau belum sesuai'}`;
+      citizen.verified_at = new Date().toLocaleString('id-ID');
     }
 
     citizens[index] = citizen;
