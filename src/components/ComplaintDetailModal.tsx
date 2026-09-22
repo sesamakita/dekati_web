@@ -118,21 +118,59 @@ export const ComplaintDetailModal: React.FC<ComplaintDetailModalProps> = ({ comp
             "{complaint.description}"
           </p>
 
-          {/* Photo Preview */}
-          {complaint.photo_url && (
-            <div className="mt-3">
-              <span className="text-[11px] text-slate-400 font-semibold block mb-1.5">
-                Foto Bukti Lapangan:
-              </span>
-              <div className="w-full h-48 rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
-                <img
-                  src={complaint.photo_url}
-                  alt="Bukti Aduan"
-                  className="w-full h-full object-cover"
-                />
+          {/* Photo Preview (Bisa 1 atau hingga 3 foto) */}
+          {(() => {
+            let photos: string[] = [];
+            if ((complaint as any).photo_urls && Array.isArray((complaint as any).photo_urls)) {
+              photos = (complaint as any).photo_urls;
+            } else if (complaint.photo_url) {
+              if (complaint.photo_url.startsWith('[') && complaint.photo_url.endsWith(']')) {
+                try {
+                  photos = JSON.parse(complaint.photo_url);
+                } catch {
+                  photos = [complaint.photo_url];
+                }
+              } else if (complaint.photo_url.includes(',')) {
+                photos = complaint.photo_url.split(',').map(s => s.trim());
+              } else {
+                photos = [complaint.photo_url];
+              }
+            }
+
+            if (photos.length === 0) return null;
+
+            return (
+              <div className="mt-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[11px] text-slate-400 font-semibold">
+                    Foto Bukti Lapangan ({photos.length} Foto):
+                  </span>
+                  <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                    Terverifikasi Terlampir
+                  </span>
+                </div>
+                <div className={`grid gap-2.5 ${photos.length === 1 ? 'grid-cols-1' : photos.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                  {photos.map((url, idx) => (
+                    <div key={idx} className="group relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200 h-40 sm:h-44">
+                      <img
+                        src={url}
+                        alt={`Bukti Aduan ${idx + 1}`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-bold gap-1"
+                      >
+                        Buka Foto Asli ↗
+                      </a>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* Handling Officer / Department */}
