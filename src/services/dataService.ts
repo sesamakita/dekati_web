@@ -187,14 +187,14 @@ class DataService {
             const currentLetters = this.getLetters();
             if (payload.eventType === 'INSERT') {
               const newLetter = payload.new as LetterRequest;
-              if (!currentLetters.find((l) => l.id === newLetter.id)) {
+              if (!currentLetters.find((l) => l.id === newLetter.id || l.tracking_number === newLetter.tracking_number)) {
                 this.setStorage(STORAGE_KEYS.LETTERS, [newLetter, ...currentLetters]);
               }
             } else if (payload.eventType === 'UPDATE') {
               const updated = payload.new as LetterRequest;
-              const idx = currentLetters.findIndex((l) => l.id === updated.id);
+              const idx = currentLetters.findIndex((l) => l.id === updated.id || l.tracking_number === updated.tracking_number);
               if (idx !== -1) {
-                currentLetters[idx] = updated;
+                currentLetters[idx] = { ...currentLetters[idx], ...updated };
                 this.setStorage(STORAGE_KEYS.LETTERS, [...currentLetters]);
               }
             }
@@ -348,38 +348,66 @@ class DataService {
       letter.signed_at = new Date().toLocaleString('id-ID');
     }
 
-    // Timeline updates
+    // Timeline updates: Perbarui alur langkah secara rapi dan sinkron
     const nowTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
-    if (!letter.timeline) letter.timeline = [];
+    const existingTimeline = Array.isArray(letter.timeline) ? [...letter.timeline] : [];
+
+    // Helper untuk update atau tambah langkah timeline
+    const updateOrCreateStep = (matchKeyword: string, newStep: { title: string; time: string; done: boolean; actor?: string }) => {
+      const idx = existingTimeline.findIndex(s => s.title.toLowerCase().includes(matchKeyword.toLowerCase()));
+      if (idx !== -1) {
+        existingTimeline[idx] = { ...existingTimeline[idx], ...newStep };
+      } else {
+        existingTimeline.push(newStep);
+      }
+    };
 
     if (status === 'in_verification') {
-      letter.timeline.push({
-        title: 'Berkas Sedang Diverifikasi Operator',
+      updateOrCreateStep('pemeriksaan berkas', {
+        title: 'Berkas Sedang Diverifikasi Petugas Pelayanan',
         time: nowTime,
         done: true,
         actor: 'Operator Pelayanan'
       });
     } else if (status === 'approved') {
-      letter.timeline.push({
-        title: `Penerbitan No. Registrasi Desa (${letter.letter_official_number || '470/...'})`,
+      updateOrCreateStep('pemeriksaan berkas', {
+        title: 'Berkas Selesai Diverifikasi Petugas',
+        time: nowTime,
+        done: true,
+        actor: 'Operator Pelayanan'
+      });
+      updateOrCreateStep('penerbitan nomor', {
+        title: `Diterbitkan No. Registrasi Desa (${letter.letter_official_number || '470/...'})`,
         time: nowTime,
         done: true,
         actor: 'Sekretariat Desa'
       });
-    } else if (status === 'signed') {
-      letter.timeline.push({
+    } else if (status === 'signed' || status === 'completed') {
+      updateOrCreateStep('pemeriksaan berkas', {
+        title: 'Berkas Selesai Diverifikasi Petugas',
+        time: nowTime,
+        done: true,
+        actor: 'Operator Pelayanan'
+      });
+      updateOrCreateStep('penerbitan nomor', {
+        title: `Diterbitkan No. Registrasi Desa (${letter.letter_official_number || '470/...'})`,
+        time: nowTime,
+        done: true,
+        actor: 'Sekretariat Desa'
+      });
+      updateOrCreateStep('tanda tangan', {
         title: 'Tanda Tangan Elektronik QR Kades Disahkan',
         time: nowTime,
         done: true,
-        actor: letter.signed_by_name
+        actor: letter.signed_by_name || 'Kepala Desa'
       });
-      letter.timeline.push({
+      updateOrCreateStep('dokumen digital', {
         title: 'Surat Selesai & Dokumen Digital Siap Diunduh',
         time: nowTime,
         done: true
       });
     } else if (status === 'rejected') {
-      letter.timeline.push({
+      updateOrCreateStep('ditolak', {
         title: `Pengajuan Ditolak: ${extra?.rejection_reason || 'Syarat tidak lengkap'}`,
         time: nowTime,
         done: true,
@@ -387,10 +415,11 @@ class DataService {
       });
     }
 
+    letter.timeline = existingTimeline;
     letters[index] = letter;
     this.setStorage(STORAGE_KEYS.LETTERS, letters);
 
-    // Sync to Supabase
+    // Sync to Supabase: cocokkan id ataupun tracking_number agar tidak terjadi silent fail
     try {
       await supabase
         .from('letter_requests')
@@ -405,7 +434,7 @@ class DataService {
           timeline: letter.timeline,
           updated_at: new Date().toISOString()
         })
-        .eq('id', id);
+        .or(`id.eq.${id},tracking_number.eq.${letter.tracking_number}`);
     } catch (e) {
       console.warn('Supabase letter update offline', e);
     }

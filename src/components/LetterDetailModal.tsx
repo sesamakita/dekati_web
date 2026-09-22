@@ -189,7 +189,7 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter, on
               Histori Alur Penerbitan
             </div>
             <div className="space-y-2 text-xs">
-              {letter.timeline.map((step, sIdx) => (
+              {(Array.isArray(letter.timeline) ? letter.timeline : []).map((step, sIdx) => (
                 <div key={sIdx} className="flex items-center justify-between py-1 border-b border-slate-100">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
