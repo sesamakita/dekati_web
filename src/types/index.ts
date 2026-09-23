@@ -136,6 +136,8 @@ export interface Complaint {
   resolution_notes?: string;
   assigned_department?: string;
   assigned_officer?: string;
+  citizen_id?: string;
+  citizen_nik?: string;
   created_at: string;
   resolved_at?: string;
 }
