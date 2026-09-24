@@ -124,6 +124,8 @@ export interface Complaint {
   title: string;
   description: string;
   location_address: string;
+  latitude?: number;
+  longitude?: number;
   rt: string;
   rw: string;
   dusun: string;
@@ -132,6 +134,7 @@ export interface Complaint {
   is_anonymous: boolean;
   status: ComplaintStatus;
   photo_url?: string;
+  photo_urls?: string[];
   resolution_proof?: string;
   resolution_notes?: string;
   assigned_department?: string;
@@ -140,6 +143,30 @@ export interface Complaint {
   citizen_nik?: string;
   created_at: string;
   resolved_at?: string;
+}
+
+export interface EmergencyContact {
+  id: string;
+  title: string;
+  phone: string;
+  icon?: string;
+  description?: string;
+  order_index?: number;
+  is_active?: boolean;
+  created_at?: string;
+}
+
+export interface VillageEvent {
+  id: string;
+  title: string;
+  category: string;
+  event_date: string;
+  event_time: string;
+  location: string;
+  organizer?: string;
+  description?: string;
+  is_active?: boolean;
+  created_at?: string;
 }
 
 export interface Announcement {

@@ -8,6 +8,7 @@ import { ComplaintsView } from './views/ComplaintsView';
 import { CitizensView } from './views/CitizensView';
 import { AnnouncementsView } from './views/AnnouncementsView';
 import { ApbdesView } from './views/ApbdesView';
+import { EventsView } from './views/EventsView';
 import { LandingPageView } from './views/LandingPageView';
 import { AuthView } from './views/AuthView';
 import { dataService } from './services/dataService';
@@ -90,7 +91,7 @@ export const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleNavigate = (tab: 'letters' | 'complaints' | 'citizens' | 'announcements' | 'apbdes') => {
+  const handleNavigate = (tab: NavTab) => {
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -107,6 +108,8 @@ export const App: React.FC = () => {
         return <CitizensView />;
       case 'announcements':
         return <AnnouncementsView />;
+      case 'events':
+        return <EventsView />;
       case 'apbdes':
         return <ApbdesView />;
       default:

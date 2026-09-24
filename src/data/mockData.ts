@@ -6,7 +6,9 @@ import {
   Complaint,
   Announcement,
   ApbdesData,
-  VillageProfile
+  VillageProfile,
+  EmergencyContact,
+  VillageEvent
 } from '../types';
 
 export const initialVillageProfile: VillageProfile = {
@@ -451,3 +453,48 @@ export const initialApbdes: ApbdesData = {
   },
   realisasi_persen: 74.5
 };
+
+export const initialEmergencyContacts: EmergencyContact[] = [
+  { id: 'emg-1', title: 'Ambulans Siaga Desa 24 Jam', phone: '0812-3456-7890', icon: 'car', description: 'Layanan antar rujukan darurat medis gratis warga', order_index: 1, is_active: true },
+  { id: 'emg-2', title: 'Bhabinkamtibmas Polsek', phone: '0813-9876-5432', icon: 'shield', description: 'Petugas kepolisian pembina ketertiban umum desa', order_index: 2, is_active: true },
+  { id: 'emg-3', title: 'Babinsa Koramil', phone: '0811-2233-4455', icon: 'shield', description: 'Bintara pembina keamanan dan ketahanan desa', order_index: 3, is_active: true },
+  { id: 'emg-4', title: 'Puskesmas / Bidan Desa', phone: '0821-5566-7788', icon: 'heart', description: 'Pelayanan gawat darurat medis & persalinan', order_index: 4, is_active: true },
+  { id: 'emg-5', title: 'Pos Pemadam Kebakaran (Damkar)', phone: '0251-8321113', icon: 'flame', description: 'Penanganan insiden kebakaran & evakuasi penyelamatan', order_index: 5, is_active: true },
+  { id: 'emg-6', title: 'Regu Satlinmas Desa', phone: '0815-4433-2211', icon: 'shield-alert', description: 'Patroli ketenteraman lingkungan RT/RW', order_index: 6, is_active: true },
+];
+
+export const initialVillageEvents: VillageEvent[] = [
+  {
+    id: 'evt-1',
+    title: 'Posyandu Balita & Skrining Lansia Sehat',
+    category: 'Kesehatan',
+    event_date: '2026-09-24',
+    event_time: '08.30 - 11.30 WIB',
+    location: 'Balai Warga RW 01 Dusun Mekar',
+    organizer: 'Kader Posyandu Melati & Bidan Desa',
+    description: 'Pemeriksaan rutin tumbuh kembang balita, imunisasi dasar lengkap, serta cek tekanan darah dan gula darah gratis bagi lansia.',
+    is_active: true
+  },
+  {
+    id: 'evt-2',
+    title: 'Musyawarah Perencanaan Desa (Musrenbangdes)',
+    category: 'Pemerintahan',
+    event_date: '2026-09-28',
+    event_time: '09.00 - 13.00 WIB',
+    location: 'Aula Graha Balai Desa Sukamaju',
+    organizer: 'BPD & Pemerintah Desa Sukamaju',
+    description: 'Penyusunan RKPDes dan penetapan prioritas usulan pembangunan fisik tahun anggaran 2027 bersama ketua RT/RW dan tokoh masyarakat.',
+    is_active: true
+  },
+  {
+    id: 'evt-3',
+    title: 'Aksi Bersih Lingkungan & Gotong Royong Musim Hujan',
+    category: 'Lingkungan',
+    event_date: '2026-10-04',
+    event_time: '07.00 - 10.30 WIB',
+    location: 'Saluran Drainase Utama RT 01 s/d RT 04 Dusun Mekar',
+    organizer: 'Karang Taruna & Satlinmas Desa',
+    description: 'Pembersihan endapan sedimentasi selokan, pemotongan dahan pohon rawan tumbang, dan kerja bakti serentak warga.',
+    is_active: true
+  }
+];

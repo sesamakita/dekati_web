@@ -13,7 +13,9 @@ import {
   CheckCircle2, 
   AlertCircle,
   MapPin,
-  ChevronRight
+  ChevronRight,
+  Calendar,
+  PhoneCall
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { LetterStatusBadge, ComplaintStatusBadge } from '../components/StatusBadge';
@@ -21,14 +23,15 @@ import { LetterDetailModal } from '../components/LetterDetailModal';
 import { ComplaintDetailModal } from '../components/ComplaintDetailModal';
 import { CitizenVerifyModal } from '../components/CitizenVerifyModal';
 import { NewAnnouncementModal } from '../components/NewAnnouncementModal';
+import { NavTab } from '../components/Sidebar';
 import { LetterRequest, Complaint, Citizen } from '../types';
 
 interface DashboardViewProps {
-  onNavigateTab: (tab: 'letters' | 'complaints' | 'citizens' | 'announcements' | 'apbdes') => void;
+  onNavigateTab: (tab: NavTab) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) => {
-  const { letters, complaints, citizens, apbdes, profile, activeRole } = useData();
+  const { letters, complaints, citizens, apbdes, profile, activeRole, villageEvents, emergencyContacts } = useData();
 
   const [selectedLetter, setSelectedLetter] = useState<LetterRequest | null>(null);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
@@ -408,6 +411,73 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                   </div>
                 ))
               )}
+            </div>
+          </div>
+
+          {/* Bento Card: Agenda Desa & Layanan Siaga 24 Jam */}
+          <div className="bento-card p-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-emerald-600" />
+                Agenda Desa Terdekat
+              </h3>
+              <button
+                onClick={() => onNavigateTab('events')}
+                className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-0.5"
+              >
+                Kelola ({villageEvents.length})
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 mt-3">
+              {villageEvents.length > 0 ? (
+                <div 
+                  onClick={() => onNavigateTab('events')}
+                  className="p-3 bg-emerald-50/50 hover:bg-emerald-50 rounded-2xl border border-emerald-200/70 transition-all cursor-pointer"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      {villageEvents[0].category}
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      {villageEvents[0].event_date}
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-bold text-slate-900 line-clamp-1 mt-1">
+                    {villageEvents[0].title}
+                  </h4>
+                  <div className="mt-2 text-[10px] text-slate-500 flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-rose-500" />
+                    <span className="truncate">{villageEvents[0].location}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-3 text-xs text-slate-400">
+                  Belum ada agenda terdaftar.
+                </div>
+              )}
+
+              {/* Quick Emergency Hotline banner */}
+              <div 
+                onClick={() => onNavigateTab('events')}
+                className="p-3 bg-rose-50/60 hover:bg-rose-50 rounded-2xl border border-rose-200/60 flex items-center justify-between cursor-pointer transition-all"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+                    <PhoneCall className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-900 block">
+                      Kontak Siaga Darurat
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      {emergencyContacts.filter(c => c.is_active !== false).length} hotline aktif 24 jam
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400" />
+              </div>
             </div>
           </div>
         </div>

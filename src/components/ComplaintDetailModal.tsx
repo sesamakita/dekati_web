@@ -93,6 +93,22 @@ export const ComplaintDetailModal: React.FC<ComplaintDetailModalProps> = ({ comp
             <p className="text-[11px] text-slate-500 mt-0.5">
               Wilayah: {complaint.dusun} (RT {complaint.rt} / RW {complaint.rw})
             </p>
+            {complaint.latitude && complaint.longitude && (
+              <div className="mt-2 pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                <span className="text-[10px] font-mono text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                  {complaint.latitude.toFixed(6)}, {complaint.longitude.toFixed(6)}
+                </span>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${complaint.latitude},${complaint.longitude}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline"
+                >
+                  <MapPin className="w-3 h-3" />
+                  Buka Maps ↗
+                </a>
+              </div>
+            )}
           </div>
 
           <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80">

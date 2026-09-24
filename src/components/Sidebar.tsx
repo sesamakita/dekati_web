@@ -10,11 +10,12 @@ import {
   RotateCcw,
   CheckCircle,
   ChevronRight,
-  Globe
+  Globe,
+  Calendar
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
 
-export type NavTab = 'dashboard' | 'letters' | 'complaints' | 'citizens' | 'announcements' | 'apbdes';
+export type NavTab = 'dashboard' | 'letters' | 'complaints' | 'citizens' | 'announcements' | 'events' | 'apbdes';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -76,6 +77,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab, onOpen
       label: 'Siaran & Berita',
       description: 'Broadcast Target Dusun/RT',
       icon: Radio,
+    },
+    {
+      id: 'events',
+      label: 'Agenda & Layanan Siaga',
+      description: 'Jadwal Musdes & Nomor Darurat',
+      icon: Calendar,
     },
     {
       id: 'apbdes',

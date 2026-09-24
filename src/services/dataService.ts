@@ -1,4 +1,3 @@
-// src/services/dataService.ts
 import {
   Citizen,
   LetterRequest,
@@ -8,7 +7,9 @@ import {
   VillageProfile,
   LetterStatus,
   ComplaintStatus,
-  VillageOfficial
+  VillageOfficial,
+  EmergencyContact,
+  VillageEvent
 } from '../types';
 import {
   initialCitizens,
@@ -16,7 +17,9 @@ import {
   initialComplaints,
   initialAnnouncements,
   initialApbdes,
-  initialVillageProfile
+  initialVillageProfile,
+  initialEmergencyContacts,
+  initialVillageEvents
 } from '../data/mockData';
 import { supabase } from './supabase';
 
@@ -28,7 +31,9 @@ const STORAGE_KEYS = {
   APBDES: 'dekati_apbdes_v1',
   PROFILE: 'dekati_profile_v1',
   ACTIVE_ROLE: 'dekati_active_role_v1',
-  CURRENT_OFFICIAL: 'dekati_current_official_v1'
+  CURRENT_OFFICIAL: 'dekati_current_official_v1',
+  EMERGENCY_CONTACTS: 'dekati_emergency_contacts_v1',
+  VILLAGE_EVENTS: 'dekati_village_events_v1'
 };
 
 export const defaultOfficials: VillageOfficial[] = [
@@ -169,6 +174,28 @@ class DataService {
         this.isSupabaseConnected = true;
       }
 
+      // 6. Check emergency contacts
+      const { data: emgData, error: emgErr } = await supabase
+        .from('emergency_contacts')
+        .select('*')
+        .order('order_index', { ascending: true });
+
+      if (!emgErr && emgData && emgData.length > 0) {
+        this.setStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, emgData);
+        this.isSupabaseConnected = true;
+      }
+
+      // 7. Check village events
+      const { data: evtData, error: evtErr } = await supabase
+        .from('village_events')
+        .select('*')
+        .order('event_date', { ascending: true });
+
+      if (!evtErr && evtData && evtData.length > 0) {
+        this.setStorage(STORAGE_KEYS.VILLAGE_EVENTS, evtData);
+        this.isSupabaseConnected = true;
+      }
+
       this.notify();
     } catch (err) {
       console.warn('[Dekati DataService] Supabase sync fallback to offline local store.', err);
@@ -257,6 +284,52 @@ class DataService {
                 currentAnnouncements[idx] = updated;
                 this.setStorage(STORAGE_KEYS.ANNOUNCEMENTS, [...currentAnnouncements]);
               }
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'emergency_contacts' },
+          (payload) => {
+            const current = this.getEmergencyContacts();
+            if (payload.eventType === 'INSERT') {
+              const newItem = payload.new as EmergencyContact;
+              if (!current.find((e) => e.id === newItem.id)) {
+                this.setStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, [...current, newItem]);
+              }
+            } else if (payload.eventType === 'UPDATE') {
+              const updated = payload.new as EmergencyContact;
+              const idx = current.findIndex((e) => e.id === updated.id);
+              if (idx !== -1) {
+                current[idx] = updated;
+                this.setStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, [...current]);
+              }
+            } else if (payload.eventType === 'DELETE') {
+              const old = payload.old as { id: string };
+              this.setStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, current.filter((e) => e.id !== old.id));
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'village_events' },
+          (payload) => {
+            const current = this.getVillageEvents();
+            if (payload.eventType === 'INSERT') {
+              const newItem = payload.new as VillageEvent;
+              if (!current.find((e) => e.id === newItem.id)) {
+                this.setStorage(STORAGE_KEYS.VILLAGE_EVENTS, [...current, newItem]);
+              }
+            } else if (payload.eventType === 'UPDATE') {
+              const updated = payload.new as VillageEvent;
+              const idx = current.findIndex((e) => e.id === updated.id);
+              if (idx !== -1) {
+                current[idx] = updated;
+                this.setStorage(STORAGE_KEYS.VILLAGE_EVENTS, [...current]);
+              }
+            } else if (payload.eventType === 'DELETE') {
+              const old = payload.old as { id: string };
+              this.setStorage(STORAGE_KEYS.VILLAGE_EVENTS, current.filter((e) => e.id !== old.id));
             }
           }
         )
@@ -630,6 +703,208 @@ class DataService {
   }
 
   // ==========================================
+  // Emergency Contacts 24 Jam
+  // ==========================================
+  getEmergencyContacts(): EmergencyContact[] {
+    return this.getStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, initialEmergencyContacts);
+  }
+
+  async createEmergencyContact(payload: Omit<EmergencyContact, 'id'>): Promise<EmergencyContact> {
+    const list = this.getEmergencyContacts();
+    const newContact: EmergencyContact = {
+      ...payload,
+      id: `emg-${Date.now()}`,
+      created_at: new Date().toISOString()
+    };
+    const updated = [...list, newContact].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+    this.setStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, updated);
+
+    // Sync to Supabase
+    try {
+      const { data, error } = await supabase
+        .from('emergency_contacts')
+        .insert({
+          title: newContact.title,
+          phone: newContact.phone,
+          icon: newContact.icon || 'call',
+          description: newContact.description || null,
+          order_index: newContact.order_index || 0,
+          is_active: newContact.is_active ?? true
+        })
+        .select('*')
+        .single();
+
+      if (!error && data) {
+        newContact.id = data.id;
+        const currentList = this.getEmergencyContacts();
+        const idx = currentList.findIndex((c) => c.title === newContact.title && c.phone === newContact.phone);
+        if (idx !== -1) {
+          currentList[idx].id = data.id;
+          this.setStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, currentList);
+        }
+      }
+    } catch (e) {
+      console.warn('Supabase emergency_contact insert offline', e);
+    }
+
+    return newContact;
+  }
+
+  async updateEmergencyContact(id: string, payload: Partial<EmergencyContact>): Promise<EmergencyContact | undefined> {
+    const list = this.getEmergencyContacts();
+    const idx = list.findIndex((c) => c.id === id);
+    if (idx === -1) return undefined;
+
+    const updatedContact = { ...list[idx], ...payload };
+    list[idx] = updatedContact;
+    const sorted = [...list].sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+    this.setStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, sorted);
+
+    // Sync to Supabase
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      if (isUuid) {
+        await supabase
+          .from('emergency_contacts')
+          .update({
+            title: updatedContact.title,
+            phone: updatedContact.phone,
+            icon: updatedContact.icon,
+            description: updatedContact.description,
+            order_index: updatedContact.order_index,
+            is_active: updatedContact.is_active
+          })
+          .eq('id', id);
+      }
+    } catch (e) {
+      console.warn('Supabase emergency_contact update offline', e);
+    }
+
+    return updatedContact;
+  }
+
+  async deleteEmergencyContact(id: string): Promise<boolean> {
+    const list = this.getEmergencyContacts();
+    const filtered = list.filter((c) => c.id !== id);
+    this.setStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, filtered);
+
+    // Sync to Supabase
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      if (isUuid) {
+        await supabase.from('emergency_contacts').delete().eq('id', id);
+      }
+    } catch (e) {
+      console.warn('Supabase emergency_contact delete offline', e);
+    }
+
+    return true;
+  }
+
+  // ==========================================
+  // Village Events (Agenda Kegiatan Desa)
+  // ==========================================
+  getVillageEvents(): VillageEvent[] {
+    return this.getStorage(STORAGE_KEYS.VILLAGE_EVENTS, initialVillageEvents);
+  }
+
+  async createVillageEvent(payload: Omit<VillageEvent, 'id'>): Promise<VillageEvent> {
+    const list = this.getVillageEvents();
+    const newEvent: VillageEvent = {
+      ...payload,
+      id: `evt-${Date.now()}`,
+      created_at: new Date().toISOString()
+    };
+    const updated = [...list, newEvent].sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
+    this.setStorage(STORAGE_KEYS.VILLAGE_EVENTS, updated);
+
+    // Sync to Supabase
+    try {
+      const { data, error } = await supabase
+        .from('village_events')
+        .insert({
+          title: newEvent.title,
+          category: newEvent.category,
+          event_date: newEvent.event_date,
+          event_time: newEvent.event_time,
+          location: newEvent.location,
+          organizer: newEvent.organizer || null,
+          description: newEvent.description || null,
+          is_active: newEvent.is_active ?? true
+        })
+        .select('*')
+        .single();
+
+      if (!error && data) {
+        newEvent.id = data.id;
+        const currentList = this.getVillageEvents();
+        const idx = currentList.findIndex((e) => e.title === newEvent.title && e.event_date === newEvent.event_date);
+        if (idx !== -1) {
+          currentList[idx].id = data.id;
+          this.setStorage(STORAGE_KEYS.VILLAGE_EVENTS, currentList);
+        }
+      }
+    } catch (e) {
+      console.warn('Supabase village_event insert offline', e);
+    }
+
+    return newEvent;
+  }
+
+  async updateVillageEvent(id: string, payload: Partial<VillageEvent>): Promise<VillageEvent | undefined> {
+    const list = this.getVillageEvents();
+    const idx = list.findIndex((e) => e.id === id);
+    if (idx === -1) return undefined;
+
+    const updatedEvent = { ...list[idx], ...payload };
+    list[idx] = updatedEvent;
+    const sorted = [...list].sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
+    this.setStorage(STORAGE_KEYS.VILLAGE_EVENTS, sorted);
+
+    // Sync to Supabase
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      if (isUuid) {
+        await supabase
+          .from('village_events')
+          .update({
+            title: updatedEvent.title,
+            category: updatedEvent.category,
+            event_date: updatedEvent.event_date,
+            event_time: updatedEvent.event_time,
+            location: updatedEvent.location,
+            organizer: updatedEvent.organizer,
+            description: updatedEvent.description,
+            is_active: updatedEvent.is_active
+          })
+          .eq('id', id);
+      }
+    } catch (e) {
+      console.warn('Supabase village_event update offline', e);
+    }
+
+    return updatedEvent;
+  }
+
+  async deleteVillageEvent(id: string): Promise<boolean> {
+    const list = this.getVillageEvents();
+    const filtered = list.filter((e) => e.id !== id);
+    this.setStorage(STORAGE_KEYS.VILLAGE_EVENTS, filtered);
+
+    // Sync to Supabase
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      if (isUuid) {
+        await supabase.from('village_events').delete().eq('id', id);
+      }
+    } catch (e) {
+      console.warn('Supabase village_event delete offline', e);
+    }
+
+    return true;
+  }
+
+  // ==========================================
   // Authentication & Pamong Accounts
   // ==========================================
   async loginOfficial(
@@ -762,6 +1037,8 @@ class DataService {
     localStorage.removeItem(STORAGE_KEYS.APBDES);
     localStorage.removeItem(STORAGE_KEYS.PROFILE);
     localStorage.removeItem(STORAGE_KEYS.CURRENT_OFFICIAL);
+    localStorage.removeItem(STORAGE_KEYS.EMERGENCY_CONTACTS);
+    localStorage.removeItem(STORAGE_KEYS.VILLAGE_EVENTS);
     this.syncFromSupabase();
     this.notify();
   }
