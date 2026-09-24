@@ -33,46 +33,11 @@ const STORAGE_KEYS = {
   ACTIVE_ROLE: 'dekati_active_role_v1',
   CURRENT_OFFICIAL: 'dekati_current_official_v1',
   EMERGENCY_CONTACTS: 'dekati_emergency_contacts_v1',
-  VILLAGE_EVENTS: 'dekati_village_events_v1'
+  VILLAGE_EVENTS: 'dekati_village_events_v1',
+  OFFICIALS_LIST: 'dekati_officials_list_v1'
 };
 
-export const defaultOfficials: VillageOfficial[] = [
-  {
-    id: 'e0000000-0000-0000-0000-000000000001',
-    nik: '3201011111110001',
-    nip: '196805121994031002',
-    nama_lengkap: 'Drs. H. Mulyadi Kartodirdjo, M.Si',
-    email: 'kades@sukamaju.desa.id',
-    role: 'kades',
-    can_sign_tte: true,
-    village_name: 'Desa Sukamaju',
-    village_code: '32.01.01.2005',
-    status: 'active'
-  },
-  {
-    id: 'e0000000-0000-0000-0000-000000000002',
-    nik: '3201012222220002',
-    nip: '198008202005011003',
-    nama_lengkap: 'Bambang Irawan, S.AP',
-    email: 'sekdes@sukamaju.desa.id',
-    role: 'sekdes',
-    can_sign_tte: false,
-    village_name: 'Desa Sukamaju',
-    village_code: '32.01.01.2005',
-    status: 'active'
-  },
-  {
-    id: 'e0000000-0000-0000-0000-000000000003',
-    nik: '3201013333330003',
-    nama_lengkap: 'Nurul Hikmah, S.Kom',
-    email: 'operator@sukamaju.desa.id',
-    role: 'operator',
-    can_sign_tte: false,
-    village_name: 'Desa Sukamaju',
-    village_code: '32.01.01.2005',
-    status: 'active'
-  }
-];
+export const defaultOfficials: VillageOfficial[] = [];
 
 type Listener = () => void;
 
@@ -415,9 +380,9 @@ class DataService {
     if (status === 'signed' || status === 'completed') {
       if (!letter.qr_verification_token) {
         letter.qr_verification_token = `valid-${Math.random().toString(36).substring(2, 8)}-${letter.letter_name.toLowerCase().replace(/[^a-z0-9]/g, '')}-2026`;
-        letter.qr_verification_url = `https://dekati.sukamaju.desa.id/verify/${letter.qr_verification_token}`;
+        letter.qr_verification_url = `https://dekati.desa.id/verify/${letter.qr_verification_token}`;
       }
-      letter.signed_by_name = extra?.signed_by_name || 'Drs. H. Mulyadi Kartodirdjo, M.Si (Kepala Desa)';
+      letter.signed_by_name = extra?.signed_by_name || this.getVillageProfile().kades_name || 'Kepala Desa';
       letter.signed_at = new Date().toLocaleString('id-ID');
     }
 
@@ -934,27 +899,21 @@ class DataService {
       console.warn('[Dekati Auth] Supabase RPC offline, menggunakan fallback demo lokal.', e);
     }
 
-    // 2. Fallback Demo Akun (Jika database offline / RPC belum dijalankan)
-    const matched = defaultOfficials.find(
+    // 2. Fallback jika offline: periksa akun aparat terdaftar di penyimpanan lokal
+    const localOfficials = this.getStorage<VillageOfficial[]>(STORAGE_KEYS.OFFICIALS_LIST, []);
+    const matched = localOfficials.find(
       (o) => o.email.toLowerCase() === cleanEmail || o.nik === cleanEmail
     );
     if (matched) {
       this.setStorage(STORAGE_KEYS.CURRENT_OFFICIAL, matched);
-      this.setActiveRole(matched.role === 'kades' ? 'kades' : 'admin_desa');
+      this.setActiveRole(matched.role === 'kades' || matched.role === 'lurah' ? 'kades' : 'admin_desa');
       return { success: true, user: matched };
     }
 
-    if (cleanEmail.includes('kades') || cleanEmail.includes('lurah')) {
-      const kadesUser = defaultOfficials[0];
-      this.setStorage(STORAGE_KEYS.CURRENT_OFFICIAL, kadesUser);
-      this.setActiveRole('kades');
-      return { success: true, user: kadesUser };
-    }
-
-    const operatorUser = defaultOfficials[2];
-    this.setStorage(STORAGE_KEYS.CURRENT_OFFICIAL, operatorUser);
-    this.setActiveRole('admin_desa');
-    return { success: true, user: operatorUser };
+    return {
+      success: false,
+      error: 'Akun perangkat desa belum terdaftar. Silakan lakukan registrasi terlebih dahulu.'
+    };
   }
 
   async registerOfficial(payload: {
@@ -977,8 +936,8 @@ class DataService {
         p_password: payload.password,
         p_role: payload.role,
         p_nik: payload.nik,
-        p_village_code: payload.village_code || '32.01.01.2005',
-        p_village_name: payload.village_name || 'Desa Sukamaju',
+        p_village_code: payload.village_code || '',
+        p_village_name: payload.village_name || 'Pemerintah Desa',
         p_phone: payload.phone || null
       });
 
@@ -991,9 +950,16 @@ class DataService {
           role: data[0].role as any,
           can_sign_tte: payload.role === 'kades' || payload.role === 'lurah',
           village_name: data[0].village_name,
-          village_code: payload.village_code || '32.01.01.2005',
+          village_code: payload.village_code || '',
           status: 'active'
         };
+
+        const localOfficials = this.getStorage<VillageOfficial[]>(STORAGE_KEYS.OFFICIALS_LIST, []);
+        if (!localOfficials.some((o) => o.email.toLowerCase() === newUser.email.toLowerCase())) {
+          localOfficials.push(newUser);
+          this.setStorage(STORAGE_KEYS.OFFICIALS_LIST, localOfficials);
+        }
+
         return { success: true, user: newUser };
       }
 
@@ -1004,7 +970,7 @@ class DataService {
       console.warn('[Dekati Register] Offline fallback', e);
     }
 
-    // 2. Fallback Response
+    // 2. Fallback Response (Local / Offline mode)
     const fallbackUser: VillageOfficial = {
       id: `off-${Date.now()}`,
       nik: payload.nik,
@@ -1012,10 +978,15 @@ class DataService {
       email: cleanEmail,
       role: payload.role as any,
       can_sign_tte: payload.role === 'kades' || payload.role === 'lurah',
-      village_name: payload.village_name || 'Desa Sukamaju',
-      village_code: payload.village_code || '32.01.01.2005',
+      village_name: payload.village_name || 'Pemerintah Desa',
+      village_code: payload.village_code || '',
       status: 'active'
     };
+
+    const localOfficials = this.getStorage<VillageOfficial[]>(STORAGE_KEYS.OFFICIALS_LIST, []);
+    localOfficials.push(fallbackUser);
+    this.setStorage(STORAGE_KEYS.OFFICIALS_LIST, localOfficials);
+
     return { success: true, user: fallbackUser };
   }
 

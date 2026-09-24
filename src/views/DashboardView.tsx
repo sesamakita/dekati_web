@@ -59,7 +59,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             Portal Administrasi Desa Terpadu • Sistem DEKATI
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Selamat Bertugas, {activeRole === 'kades' ? profile.kades_name : profile.sekdes_name} 👋
+            Selamat Bertugas, {activeRole === 'kades' ? (profile.kades_name || 'Kepala Desa') : (profile.sekdes_name || 'Aparatur Desa')} 👋
           </h1>
           <p className="text-sm text-emerald-100/90 mt-2 leading-relaxed">
             Kelola permohonan surat warga, tanggapi laporan aduan fasilitas desa, dan pantau transparansi APBDes {profile.name} secara real-time.
@@ -189,7 +189,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-2 flex items-center justify-between">
-            <span>Rp 1,56 M Realisasi</span>
+            <span>
+              {apbdes.belanja.total_realized >= 1000000000
+                ? `Rp ${(apbdes.belanja.total_realized / 1000000000).toFixed(2)} M Realisasi`
+                : apbdes.belanja.total_realized > 0
+                ? `Rp ${(apbdes.belanja.total_realized / 1000000).toFixed(0)} Jt Realisasi`
+                : 'Rp 0 Realisasi'}
+            </span>
             <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-600 transition-colors" />
           </p>
         </div>
@@ -220,37 +226,43 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             </div>
 
             <div className="divide-y divide-slate-100 mt-2">
-              {letters.slice(0, 4).map((letter) => (
-                <div
-                  key={letter.id}
-                  onClick={() => setSelectedLetter(letter)}
-                  className="py-3.5 px-2 -mx-2 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer flex items-center justify-between gap-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
-                      <FileText className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-xs text-slate-900">
-                          {letter.letter_name}
-                        </span>
-                        <span className="font-mono text-[11px] text-slate-400">
-                          ({letter.tracking_number})
-                        </span>
-                      </div>
-                      <div className="text-xs text-slate-500 mt-0.5">
-                        Pemohon: <span className="font-semibold text-slate-700">{letter.citizen_name}</span> • NIK: {letter.citizen_nik}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 shrink-0">
-                    <LetterStatusBadge status={letter.status} />
-                    <ChevronRight className="w-4 h-4 text-slate-300" />
-                  </div>
+              {letters.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs">
+                  Belum ada antrean permohonan surat masuk.
                 </div>
-              ))}
+              ) : (
+                letters.slice(0, 4).map((letter) => (
+                  <div
+                    key={letter.id}
+                    onClick={() => setSelectedLetter(letter)}
+                    className="py-3.5 px-2 -mx-2 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer flex items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-xs text-slate-900">
+                            {letter.letter_name}
+                          </span>
+                          <span className="font-mono text-[11px] text-slate-400">
+                            ({letter.tracking_number})
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          Pemohon: <span className="font-semibold text-slate-700">{letter.citizen_name}</span> • NIK: {letter.citizen_nik}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <LetterStatusBadge status={letter.status} />
+                      <ChevronRight className="w-4 h-4 text-slate-300" />
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -280,24 +292,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                 <div className="flex justify-between text-xs mb-1.5 font-bold">
                   <span className="text-slate-700">Total Pendapatan Desa</span>
                   <span className="text-emerald-700 font-mono">
-                    Rp {(apbdes.pendapatan.total_realized / 1000000000).toFixed(2)} M / Rp {(apbdes.pendapatan.total_budget / 1000000000).toFixed(2)} M
+                    Rp {((apbdes.pendapatan?.total_realized || 0) / 1000000000).toFixed(2)} M / Rp {((apbdes.pendapatan?.total_budget || 0) / 1000000000).toFixed(2)} M
                   </span>
                 </div>
                 <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden mb-3">
                   <div
                     className="bg-emerald-600 h-full rounded-full transition-all"
                     style={{
-                      width: `${(apbdes.pendapatan.total_realized / apbdes.pendapatan.total_budget) * 100}%`,
+                      width: `${(apbdes.pendapatan?.total_budget || 0) > 0 ? Math.min(((apbdes.pendapatan.total_realized / apbdes.pendapatan.total_budget) * 100), 100) : 0}%`,
                     }}
                   ></div>
                 </div>
                 <div className="space-y-1.5 text-[11px] text-slate-600">
-                  {apbdes.pendapatan.items.slice(0, 2).map((item, i) => (
-                    <div key={i} className="flex justify-between">
-                      <span className="truncate max-w-[180px]">{item.name}</span>
-                      <span className="font-bold font-mono">{item.percentage}%</span>
-                    </div>
-                  ))}
+                  {(apbdes.pendapatan?.items || []).length === 0 ? (
+                    <div className="text-slate-400 italic text-[11px]">Belum ada pos pendapatan</div>
+                  ) : (
+                    apbdes.pendapatan.items.slice(0, 2).map((item, i) => (
+                      <div key={i} className="flex justify-between">
+                        <span className="truncate max-w-[180px]">{item.name}</span>
+                        <span className="font-bold font-mono">{item.percentage}%</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -306,24 +322,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                 <div className="flex justify-between text-xs mb-1.5 font-bold">
                   <span className="text-slate-700">Total Belanja & Kegiatan</span>
                   <span className="text-blue-700 font-mono">
-                    Rp {(apbdes.belanja.total_realized / 1000000000).toFixed(2)} M / Rp {(apbdes.belanja.total_budget / 1000000000).toFixed(2)} M
+                    Rp {((apbdes.belanja?.total_realized || 0) / 1000000000).toFixed(2)} M / Rp {((apbdes.belanja?.total_budget || 0) / 1000000000).toFixed(2)} M
                   </span>
                 </div>
                 <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden mb-3">
                   <div
                     className="bg-blue-600 h-full rounded-full transition-all"
                     style={{
-                      width: `${(apbdes.belanja.total_realized / apbdes.belanja.total_budget) * 100}%`,
+                      width: `${(apbdes.belanja?.total_budget || 0) > 0 ? Math.min(((apbdes.belanja.total_realized / apbdes.belanja.total_budget) * 100), 100) : 0}%`,
                     }}
                   ></div>
                 </div>
                 <div className="space-y-1.5 text-[11px] text-slate-600">
-                  {apbdes.belanja.items.slice(0, 2).map((item, i) => (
-                    <div key={i} className="flex justify-between">
-                      <span className="truncate max-w-[180px]">{item.name}</span>
-                      <span className="font-bold font-mono">{item.percentage}%</span>
-                    </div>
-                  ))}
+                  {(apbdes.belanja?.items || []).length === 0 ? (
+                    <div className="text-slate-400 italic text-[11px]">Belum ada pos belanja</div>
+                  ) : (
+                    apbdes.belanja.items.slice(0, 2).map((item, i) => (
+                      <div key={i} className="flex justify-between">
+                        <span className="truncate max-w-[180px]">{item.name}</span>
+                        <span className="font-bold font-mono">{item.percentage}%</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -348,28 +368,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             </div>
 
             <div className="space-y-3 mt-3">
-              {complaints.slice(0, 3).map((cmp) => (
-                <div
-                  key={cmp.id}
-                  onClick={() => setSelectedComplaint(cmp)}
-                  className="p-3 bg-slate-50 hover:bg-slate-100/80 rounded-2xl border border-slate-200/70 transition-all cursor-pointer"
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <ComplaintStatusBadge status={cmp.status} />
-                    <span className="text-[10px] text-slate-400">{cmp.dusun}</span>
-                  </div>
-                  <h4 className="text-xs font-bold text-slate-800 line-clamp-1 mt-1">
-                    {cmp.title}
-                  </h4>
-                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">
-                    {cmp.description}
-                  </p>
-                  <div className="mt-2 text-[10px] text-slate-400 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-rose-500" />
-                    <span className="truncate">{cmp.location_address}</span>
-                  </div>
+              {complaints.length === 0 ? (
+                <div className="text-center py-6 text-xs text-slate-400">
+                  Belum ada laporan aduan warga.
                 </div>
-              ))}
+              ) : (
+                complaints.slice(0, 3).map((cmp) => (
+                  <div
+                    key={cmp.id}
+                    onClick={() => setSelectedComplaint(cmp)}
+                    className="p-3 bg-slate-50 hover:bg-slate-100/80 rounded-2xl border border-slate-200/70 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <ComplaintStatusBadge status={cmp.status} />
+                      <span className="text-[10px] text-slate-400">{cmp.dusun}</span>
+                    </div>
+                    <h4 className="text-xs font-bold text-slate-800 line-clamp-1 mt-1">
+                      {cmp.title}
+                    </h4>
+                    <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">
+                      {cmp.description}
+                    </p>
+                    <div className="mt-2 text-[10px] text-slate-400 flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-rose-500" />
+                      <span className="truncate">{cmp.location_address}</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 

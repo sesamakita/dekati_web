@@ -125,7 +125,7 @@ export const MobileDownloadModal: React.FC<MobileDownloadModalProps> = ({ isOpen
               </div>
               <div className="flex items-start gap-2.5">
                 <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">2</span>
-                <span>Masuk dengan Nomor Induk Kependudukan (NIK) Anda yang terdaftar di Buku Induk Desa Sukamaju.</span>
+                <span>Masuk dengan Nomor Induk Kependudukan (NIK) Anda yang terdaftar di Buku Induk Kependudukan Desa.</span>
               </div>
               <div className="flex items-start gap-2.5">
                 <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5">3</span>

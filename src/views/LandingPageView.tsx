@@ -422,7 +422,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterAdmin }
                         </div>
                         <div>
                           <div className="text-xs font-bold text-emerald-950">Surat Sah Bertanda Tangan Elektronik (TTE QR)</div>
-                          <div className="text-[11px] text-emerald-700">Disahkan secara sah oleh {trackedLetter.signed_by_name || 'Kepala Desa Sukamaju'}</div>
+                          <div className="text-[11px] text-emerald-700">Disahkan secara sah oleh {trackedLetter.signed_by_name || profile.kades_name || 'Kepala Desa'}</div>
                         </div>
                       </div>
                       <button
@@ -696,7 +696,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterAdmin }
               Transparansi Anggaran Pendapatan & Belanja Desa (APBDes)
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-              Pemerintah Desa Sukamaju membuka data serapan dana desa secara berkala
+              {profile.name || 'Pemerintah Desa'} membuka data serapan dana desa secara berkala
               sebagai komitmen tata kelola pemerintahan yang bersih dan bebas korupsi.
             </p>
           </div>
@@ -877,7 +877,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterAdmin }
               },
               {
                 q: 'Apakah warga dikenakan biaya saat menggunakan aplikasi mobile atau mengurus surat?',
-                a: 'Tidak ada biaya sepeser pun. Seluruh layanan E-Surat, pengaduan fasilitas, dan pengumuman balai desa dapat diakses secara gratis oleh warga yang terdata secara sah pada Buku Induk Kependudukan Desa Sukamaju.'
+                a: `Tidak ada biaya sepeser pun. Seluruh layanan E-Surat, pengaduan fasilitas, dan pengumuman balai desa dapat diakses secara gratis oleh warga yang terdata secara sah pada Buku Induk Kependudukan ${profile.name || 'Desa'}.`
               },
               {
                 q: 'Bagaimana keamanan data NIK dan dokumen Kartu Keluarga warga?',

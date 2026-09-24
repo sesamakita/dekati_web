@@ -116,7 +116,7 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter, on
               </div>
               <div>
                 <span className="text-slate-400">Alamat Kependudukan:</span>
-                <p className="font-medium text-slate-700">{letter.citizen_address || 'Desa Sukamaju'}</p>
+                <p className="font-medium text-slate-700">{letter.citizen_address || 'Wilayah Desa'}</p>
               </div>
             </div>
 

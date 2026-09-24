@@ -39,7 +39,7 @@ export const NewAnnouncementModal: React.FC<NewAnnouncementModalProps> = ({ onCl
       target_type: targetType,
       target_value: targetValue || undefined,
       is_urgent: isUrgent,
-      author: profile.sekdes_name || 'Sekretariat Desa Sukamaju',
+      author: profile.sekdes_name || `Sekretariat ${profile.name || 'Desa'}`,
     });
 
     onClose();

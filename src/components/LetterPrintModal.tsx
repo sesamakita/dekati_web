@@ -56,20 +56,20 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({ letter, prof
                 <span className="text-2xl font-bold font-sans text-emerald-800">DS</span>
               </div>
               <div>
-                <h4 className="text-xs tracking-widest font-sans font-bold uppercase text-slate-700">
-                  PEMERINTAH KABUPATEN BOGOR
+                <h4 className="text-xs tracking-wider font-sans font-bold uppercase text-slate-700">
+                  {profile.regency ? `PEMERINTAH ${profile.regency.toUpperCase()}` : 'PEMERINTAH KABUPATEN'}
                 </h4>
                 <h3 className="text-sm tracking-wider font-sans font-bold uppercase text-slate-800">
-                  KECAMATAN CIAWI
+                  {profile.district ? `KECAMATAN ${profile.district.toUpperCase()}` : 'KECAMATAN'}
                 </h3>
                 <h2 className="text-xl tracking-wider font-sans font-extrabold uppercase text-slate-950">
-                  PEMERINTAH DESA SUKAMAJU
+                  {profile.name ? `PEMERINTAH ${profile.name.toUpperCase()}` : 'PEMERINTAH DESA'}
                 </h2>
                 <p className="text-[11px] font-sans text-slate-600 mt-1">
-                  {profile.office_address} • Telp: {profile.office_phone} • Kode Pos: {profile.postal_code}
+                  {[profile.office_address, profile.office_phone ? `Telp: ${profile.office_phone}` : '', profile.postal_code ? `Kode Pos: ${profile.postal_code}` : ''].filter(Boolean).join(' • ') || 'Alamat Kantor Pemerintahan Desa'}
                 </p>
                 <p className="text-[10px] font-sans text-slate-500">
-                  Website: https://sukamaju.desa.id • Email: {profile.office_email}
+                  Email: {profile.office_email || 'sekretariat@desa.id'}
                 </p>
               </div>
             </div>
@@ -88,7 +88,7 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({ letter, prof
           {/* Letter Content Opening */}
           <div className="text-xs sm:text-sm leading-relaxed text-justify space-y-4 font-sans text-slate-800">
             <p>
-              Yang bertanda tangan di bawah ini, Kepala Desa Sukamaju, Kecamatan Ciawi, Kabupaten Bogor, menerangkan dengan sebenarnya bahwa:
+              Yang bertanda tangan di bawah ini, Kepala {profile.name || 'Desa'}, {profile.district ? `Kecamatan ${profile.district}, ` : ''}{profile.regency ? `${profile.regency}, ` : ''}menerangkan dengan sebenarnya bahwa:
             </p>
 
             {/* Citizen Data Table */}
@@ -106,7 +106,7 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({ letter, prof
               <div className="grid grid-cols-12 text-xs">
                 <span className="col-span-4 text-slate-600">Alamat Kependudukan</span>
                 <span className="col-span-1">:</span>
-                <span className="col-span-7">{letter.citizen_address || 'Kp. Sukamaju, Desa Sukamaju, Kec. Ciawi'}</span>
+                <span className="col-span-7">{letter.citizen_address || 'Wilayah Desa'}</span>
               </div>
               <div className="grid grid-cols-12 text-xs">
                 <span className="col-span-4 text-slate-600">Keperluan</span>
@@ -116,7 +116,7 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({ letter, prof
             </div>
 
             <p>
-              Adalah benar-benar warga yang bertempat tinggal secara sah di wilayah Desa Sukamaju dan tercatat dalam data kependudukan resmi desa. Sepanjang sepengetahuan kami, yang bersangkutan memiliki catatan permohonan sesuai dengan maksud dan tujuan di atas.
+              Adalah benar-benar warga yang bertempat tinggal secara sah di wilayah {profile.name || 'Desa'} dan tercatat dalam data kependudukan resmi desa. Sepanjang sepengetahuan kami, yang bersangkutan memiliki catatan permohonan sesuai dengan maksud dan tujuan di atas.
             </p>
 
             <p>
@@ -142,7 +142,7 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({ letter, prof
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                   TTE Sah Desa
                 </div>
-                Pindai QR untuk memeriksa keabsahan surat di portal resmi Desa Sukamaju.
+                Pindai QR untuk memeriksa keabsahan surat di portal resmi {profile.name || 'Desa'}.
                 <div className="font-mono text-[9px] text-slate-400 mt-1">
                   ID: {letter.qr_verification_token?.slice(0, 16) || letter.tracking_number}
                 </div>
@@ -152,13 +152,13 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({ letter, prof
             {/* Official Signer Box */}
             <div className="text-center font-sans">
               <p className="text-xs text-slate-700">
-                Sukamaju, {letter.signed_at?.split(',')[0] || new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                {profile.name?.replace(/^(Desa|Kelurahan)\s+/i, '') || 'Wilayah'}, {letter.signed_at?.split(',')[0] || new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
               </p>
               <p className="text-xs font-bold text-slate-900 mb-12">
-                Kepala Desa Sukamaju
+                Kepala {profile.name || 'Desa'}
               </p>
               <p className="text-xs font-bold underline text-slate-950">
-                {profile.kades_name}
+                {profile.kades_name || 'Kepala Desa'}
               </p>
               <p className="text-[10px] text-slate-500">
                 NIP. 19740510 199903 1 004

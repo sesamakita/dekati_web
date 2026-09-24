@@ -74,7 +74,7 @@ export const ApbdesView: React.FC = () => {
             <div
               className="bg-emerald-600 h-full rounded-full"
               style={{
-                width: `${(apbdes.pendapatan.total_realized / apbdes.pendapatan.total_budget) * 100}%`,
+                width: `${(apbdes.pendapatan?.total_budget || 0) > 0 ? Math.min(((apbdes.pendapatan.total_realized / apbdes.pendapatan.total_budget) * 100), 100) : 0}%`,
               }}
             ></div>
           </div>
@@ -95,7 +95,7 @@ export const ApbdesView: React.FC = () => {
             <div
               className="bg-blue-600 h-full rounded-full"
               style={{
-                width: `${(apbdes.belanja.total_realized / apbdes.belanja.total_budget) * 100}%`,
+                width: `${(apbdes.belanja?.total_budget || 0) > 0 ? Math.min(((apbdes.belanja.total_realized / apbdes.belanja.total_budget) * 100), 100) : 0}%`,
               }}
             ></div>
           </div>
@@ -131,53 +131,59 @@ export const ApbdesView: React.FC = () => {
           </h3>
 
           <div className="space-y-3">
-            {apbdes.pendapatan.items.map((item) => (
-              <div
-                key={item.account_code}
-                className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 text-xs"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-slate-800">{item.name}</span>
-                  <span className="font-mono text-[11px] text-slate-400">
-                    {item.account_code}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-slate-500 mb-2">
-                  <span>Anggaran: Rp {item.budget_amount.toLocaleString('id-ID')}</span>
-                  <span className="font-bold text-emerald-700">{item.percentage}%</span>
-                </div>
-
-                {editingCode === item.account_code ? (
-                  <div className="flex gap-2 items-center mt-2">
-                    <input
-                      type="number"
-                      value={editAmount}
-                      onChange={(e) => setEditAmount(Number(e.target.value))}
-                      className="px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-mono w-full"
-                    />
-                    <button
-                      onClick={() => handleSaveEdit('pendapatan', item.account_code)}
-                      className="p-1.5 bg-emerald-600 text-white rounded-lg"
-                    >
-                      <Save className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between text-slate-700 pt-1 border-t border-slate-200/60">
-                    <span className="font-bold font-mono">
-                      Realisasi: Rp {item.realized_amount.toLocaleString('id-ID')}
-                    </span>
-                    <button
-                      onClick={() => handleStartEdit(item.account_code, item.realized_amount)}
-                      className="text-slate-400 hover:text-emerald-700"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
+            {apbdes.pendapatan.items.length === 0 ? (
+              <div className="text-center py-8 text-xs text-slate-400">
+                Belum ada rincian pos pendapatan.
               </div>
-            ))}
+            ) : (
+              apbdes.pendapatan.items.map((item) => (
+                <div
+                  key={item.account_code}
+                  className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 text-xs"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-slate-800">{item.name}</span>
+                    <span className="font-mono text-[11px] text-slate-400">
+                      {item.account_code}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-slate-500 mb-2">
+                    <span>Anggaran: Rp {item.budget_amount.toLocaleString('id-ID')}</span>
+                    <span className="font-bold text-emerald-700">{item.percentage}%</span>
+                  </div>
+
+                  {editingCode === item.account_code ? (
+                    <div className="flex gap-2 items-center mt-2">
+                      <input
+                        type="number"
+                        value={editAmount}
+                        onChange={(e) => setEditAmount(Number(e.target.value))}
+                        className="px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-mono w-full"
+                      />
+                      <button
+                        onClick={() => handleSaveEdit('pendapatan', item.account_code)}
+                        className="p-1.5 bg-emerald-600 text-white rounded-lg"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between text-slate-700 pt-1 border-t border-slate-200/60">
+                      <span className="font-bold font-mono">
+                        Realisasi: Rp {item.realized_amount.toLocaleString('id-ID')}
+                      </span>
+                      <button
+                        onClick={() => handleStartEdit(item.account_code, item.realized_amount)}
+                        className="text-slate-400 hover:text-emerald-700"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -191,53 +197,59 @@ export const ApbdesView: React.FC = () => {
           </h3>
 
           <div className="space-y-3">
-            {apbdes.belanja.items.map((item) => (
-              <div
-                key={item.account_code}
-                className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 text-xs"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-slate-800">{item.name}</span>
-                  <span className="font-mono text-[11px] text-slate-400">
-                    {item.account_code}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-slate-500 mb-2">
-                  <span>Plafon: Rp {item.budget_amount.toLocaleString('id-ID')}</span>
-                  <span className="font-bold text-blue-700">{item.percentage}%</span>
-                </div>
-
-                {editingCode === item.account_code ? (
-                  <div className="flex gap-2 items-center mt-2">
-                    <input
-                      type="number"
-                      value={editAmount}
-                      onChange={(e) => setEditAmount(Number(e.target.value))}
-                      className="px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-mono w-full"
-                    />
-                    <button
-                      onClick={() => handleSaveEdit('belanja', item.account_code)}
-                      className="p-1.5 bg-blue-600 text-white rounded-lg"
-                    >
-                      <Save className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between text-slate-700 pt-1 border-t border-slate-200/60">
-                    <span className="font-bold font-mono">
-                      Realisasi: Rp {item.realized_amount.toLocaleString('id-ID')}
-                    </span>
-                    <button
-                      onClick={() => handleStartEdit(item.account_code, item.realized_amount)}
-                      className="text-slate-400 hover:text-blue-700"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
+            {apbdes.belanja.items.length === 0 ? (
+              <div className="text-center py-8 text-xs text-slate-400">
+                Belum ada rincian pos belanja.
               </div>
-            ))}
+            ) : (
+              apbdes.belanja.items.map((item) => (
+                <div
+                  key={item.account_code}
+                  className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 text-xs"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-slate-800">{item.name}</span>
+                    <span className="font-mono text-[11px] text-slate-400">
+                      {item.account_code}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-slate-500 mb-2">
+                    <span>Plafon: Rp {item.budget_amount.toLocaleString('id-ID')}</span>
+                    <span className="font-bold text-blue-700">{item.percentage}%</span>
+                  </div>
+
+                  {editingCode === item.account_code ? (
+                    <div className="flex gap-2 items-center mt-2">
+                      <input
+                        type="number"
+                        value={editAmount}
+                        onChange={(e) => setEditAmount(Number(e.target.value))}
+                        className="px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-mono w-full"
+                      />
+                      <button
+                        onClick={() => handleSaveEdit('belanja', item.account_code)}
+                        className="p-1.5 bg-blue-600 text-white rounded-lg"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between text-slate-700 pt-1 border-t border-slate-200/60">
+                      <span className="font-bold font-mono">
+                        Realisasi: Rp {item.realized_amount.toLocaleString('id-ID')}
+                      </span>
+                      <button
+                        onClick={() => handleStartEdit(item.account_code, item.realized_amount)}
+                        className="text-slate-400 hover:text-blue-700"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

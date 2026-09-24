@@ -48,27 +48,12 @@ export const AuthView: React.FC<AuthViewProps> = ({
   const [regRole, setRegRole] = useState('kades');
   const [regNik, setRegNik] = useState('');
   const [regEmail, setRegEmail] = useState('');
-  const [regVillage, setRegVillage] = useState(profile.name);
-  const [regVillageCode, setRegVillageCode] = useState(profile.code || '32.01.01.2005');
+  const [regVillage, setRegVillage] = useState(profile.name || 'Pemerintah Desa');
+  const [regVillageCode, setRegVillageCode] = useState(profile.code || '');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [regAgree, setRegAgree] = useState(true);
   const [registerSuccess, setRegisterSuccess] = useState(false);
-
-  // Quick Demo Autofill Handlers
-  const handleAutofillKades = () => {
-    setLoginRole('kades');
-    setLoginEmail('kades@sukamaju.desa.id');
-    setLoginPassword('kades123');
-    setLoginError('');
-  };
-
-  const handleAutofillOperator = () => {
-    setLoginRole('admin_desa');
-    setLoginEmail('operator@sukamaju.desa.id');
-    setLoginPassword('operator123');
-    setLoginError('');
-  };
 
   // Submit Login
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -317,30 +302,6 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   </p>
                 </div>
 
-                {/* Quick Demo Autofill Pills */}
-                <div className="p-3.5 bg-emerald-50/70 rounded-2xl border border-emerald-200/80 space-y-2">
-                  <span className="text-[11px] font-bold text-emerald-900 block">
-                    ⚡ Uji Coba Cepat (Autofill Sekali Klik):
-                  </span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleAutofillKades}
-                      className="px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300 shadow-sm transition-all flex items-center gap-1.5"
-                    >
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Masuk sbg Kepala Desa (TTE)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleAutofillOperator}
-                      className="px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300 shadow-sm transition-all flex items-center gap-1.5"
-                    >
-                      <UserCog className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Masuk sbg Operator Layanan</span>
-                    </button>
-                  </div>
-                </div>
 
                 {/* Login Form */}
                 <form onSubmit={handleLoginSubmit} className="space-y-4">
@@ -385,7 +346,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                         type="text"
                         value={loginEmail}
                         onChange={(e) => setLoginEmail(e.target.value)}
-                        placeholder="kades@sukamaju.desa.id atau NIK..."
+                        placeholder="email@desa.id atau NIK..."
                         className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-slate-50 focus:bg-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 transition-all"
                       />
                     </div>
@@ -608,8 +569,8 @@ export const AuthView: React.FC<AuthViewProps> = ({
           {/* Bottom Help Text */}
           <div className="pt-6 border-t border-slate-100 text-center text-xs text-slate-400">
             Butuh bantuan teknis atau asistensi integrasi? Hubungi{' '}
-            <a href="mailto:sekretariat@sukamaju.desa.id" className="text-emerald-700 font-bold hover:underline">
-              Helpdesk Desa Sukamaju
+            <a href="mailto:bantuan@desa.id" className="text-emerald-700 font-bold hover:underline">
+              Helpdesk Layanan Terpadu
             </a>
           </div>
         </div>

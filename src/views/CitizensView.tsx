@@ -49,7 +49,7 @@ export const CitizensView: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `buku_induk_kependudukan_sukamaju_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `buku_induk_kependudukan_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -151,12 +151,20 @@ export const CitizensView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredCitizens.map((citizen) => (
-                <tr
-                  key={citizen.id}
-                  className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
-                  onClick={() => setSelectedCitizen(citizen)}
-                >
+              {filteredCitizens.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <Users className="w-10 h-10 mx-auto mb-2 text-slate-300 stroke-1" />
+                    Belum ada data warga terdaftar.
+                  </td>
+                </tr>
+              ) : (
+                filteredCitizens.map((citizen) => (
+                  <tr
+                    key={citizen.id}
+                    className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
+                    onClick={() => setSelectedCitizen(citizen)}
+                  >
                   <td className="py-4 px-5 font-mono">
                     <div className="font-bold text-slate-900">{citizen.nik}</div>
                     <div className="text-[11px] text-slate-400">KK: {citizen.no_kk}</div>
@@ -203,7 +211,7 @@ export const CitizensView: React.FC = () => {
                     </button>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

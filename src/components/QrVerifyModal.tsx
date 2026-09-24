@@ -53,7 +53,7 @@ export const QrVerifyModal: React.FC<QrVerifyModalProps> = ({ letter, onClose })
             Verifikasi Keaslian Dokumen
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Sistem E-Surat Resmi Pemerintah Desa Sukamaju
+            Sistem E-Surat Resmi Layanan Desa
           </p>
         </div>
 
@@ -98,7 +98,7 @@ export const QrVerifyModal: React.FC<QrVerifyModalProps> = ({ letter, onClose })
               <Building2 className="w-3.5 h-3.5" /> Penandatangan:
             </span>
             <span className="font-bold text-emerald-800 text-right">
-              {letter.signed_by_name || 'Kepala Desa Sukamaju'}
+              {letter.signed_by_name || 'Kepala Desa'}
             </span>
           </div>
           <div className="flex justify-between py-1 border-b border-slate-100">
