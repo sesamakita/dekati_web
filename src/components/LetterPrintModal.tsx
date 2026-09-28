@@ -1,5 +1,5 @@
-// src/components/LetterPrintModal.tsx
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Printer, X, Download, ShieldCheck } from 'lucide-react';
 import { LetterRequest, VillageProfile } from '../types';
 
@@ -14,10 +14,18 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({ letter, prof
     window.print();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
+      onClick={onClose}
+    >
       {/* Modal Container: Max-height with safe viewport distance up and down */}
-      <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[calc(100vh-3.5rem)] sm:max-h-[calc(100vh-5rem)] shadow-2xl border border-slate-100 flex flex-col overflow-hidden relative">
+      <div 
+        className="my-auto bg-white rounded-3xl max-w-3xl w-full max-h-[calc(100vh-3.5rem)] sm:max-h-[calc(100vh-5rem)] shadow-2xl border border-slate-100 flex flex-col overflow-hidden relative"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Modal Controls (Fixed Header, Hidden in Print) */}
         <div className="no-print shrink-0 px-6 sm:px-8 py-4 border-b border-slate-200 flex items-center justify-between bg-white">
@@ -168,6 +176,7 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({ letter, prof
         </div>
       </div>
     </div>
-  </div>
+  </div>,
+  document.body
 );
 };

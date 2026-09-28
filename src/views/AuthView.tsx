@@ -16,9 +16,14 @@ import {
   FileText, 
   KeyRound, 
   Check, 
-  AlertCircle
+  AlertCircle,
+  Compass,
+  Search,
+  MapPin
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
+import { wilayahService, Province, Regency, District, Village, toTitleCase } from '../services/wilayahService';
+import { CustomDialog } from '../components/CustomDialog';
 
 interface AuthViewProps {
   onLoginSuccess: (role: 'admin_desa' | 'kades', userEmail?: string) => void;
@@ -42,18 +47,112 @@ export const AuthView: React.FC<AuthViewProps> = ({
   const [loginRole, setLoginRole] = useState<'admin_desa' | 'kades'>('admin_desa');
   const [loginError, setLoginError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showForgotPasswordDialog, setShowForgotPasswordDialog] = useState(false);
 
   // Register Form States
   const [regName, setRegName] = useState('');
   const [regRole, setRegRole] = useState('kades');
   const [regNik, setRegNik] = useState('');
   const [regEmail, setRegEmail] = useState('');
-  const [regVillage, setRegVillage] = useState(profile.name || 'Pemerintah Desa');
+  const [regVillage, setRegVillage] = useState(profile.name && profile.name !== 'Pemerintah Desa' ? profile.name : '');
   const [regVillageCode, setRegVillageCode] = useState(profile.code || '');
+  const [regDistrict, setRegDistrict] = useState(profile.district || '');
+  const [regRegency, setRegRegency] = useState(profile.regency || '');
+  const [regProvince, setRegProvince] = useState(profile.province || '');
   const [regPassword, setRegPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
   const [regAgree, setRegAgree] = useState(true);
   const [registerSuccess, setRegisterSuccess] = useState(false);
+
+  // Wilayah Indonesia Picker states
+  const [showWilayahPicker, setShowWilayahPicker] = useState(false);
+  const [searchWilayah, setSearchWilayah] = useState('');
+  const [provinces, setProvinces] = useState<Province[]>([]);
+  const [regencies, setRegencies] = useState<Regency[]>([]);
+  const [districts, setDistricts] = useState<District[]>([]);
+  const [villages, setVillages] = useState<Village[]>([]);
+  const [selProvId, setSelProvId] = useState('');
+  const [selRegId, setSelRegId] = useState('');
+  const [selDistId, setSelDistId] = useState('');
+  const [selVilId, setSelVilId] = useState('');
+  const [loadingWilayah, setLoadingWilayah] = useState(false);
+
+  const toggleWilayahPicker = async () => {
+    const nextState = !showWilayahPicker;
+    setShowWilayahPicker(nextState);
+    if (nextState && provinces.length === 0) {
+      setLoadingWilayah(true);
+      const data = await wilayahService.getProvinces();
+      setProvinces(data);
+      setLoadingWilayah(false);
+    }
+  };
+
+  const handleProvChange = async (provId: string) => {
+    setSelProvId(provId);
+    setSelRegId('');
+    setSelDistId('');
+    setSelVilId('');
+    setRegencies([]);
+    setDistricts([]);
+    setVillages([]);
+    const provObj = provinces.find((p) => p.id === provId);
+    if (provObj) {
+      setRegProvince(toTitleCase(provObj.name));
+    }
+    if (provId) {
+      setLoadingWilayah(true);
+      const data = await wilayahService.getRegencies(provId);
+      setRegencies(data);
+      setLoadingWilayah(false);
+    }
+  };
+
+  const handleRegChange = async (regId: string) => {
+    setSelRegId(regId);
+    setSelDistId('');
+    setSelVilId('');
+    setDistricts([]);
+    setVillages([]);
+    const regObj = regencies.find((r) => r.id === regId);
+    if (regObj) {
+      setRegRegency(toTitleCase(regObj.name));
+    }
+    if (regId) {
+      setLoadingWilayah(true);
+      const data = await wilayahService.getDistricts(regId);
+      setDistricts(data);
+      setLoadingWilayah(false);
+    }
+  };
+
+  const handleDistChange = async (distId: string) => {
+    setSelDistId(distId);
+    setSelVilId('');
+    setVillages([]);
+    const distObj = districts.find((d) => d.id === distId);
+    if (distObj) {
+      setRegDistrict(`Kecamatan ${toTitleCase(distObj.name)}`);
+    }
+    if (distId) {
+      setLoadingWilayah(true);
+      const data = await wilayahService.getVillages(distId);
+      setVillages(data);
+      setLoadingWilayah(false);
+    }
+  };
+
+  const handleVilChange = (vilId: string) => {
+    setSelVilId(vilId);
+    const v = villages.find((item) => item.id === vilId);
+    if (v) {
+      const prefix = regRole === 'lurah' ? 'Kelurahan' : 'Desa';
+      setRegVillage(`${prefix} ${toTitleCase(v.name)}`);
+      setRegVillageCode(v.id);
+    }
+  };
 
   // Submit Login
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -90,8 +189,8 @@ export const AuthView: React.FC<AuthViewProps> = ({
     e.preventDefault();
     setLoginError('');
 
-    if (!regName.trim() || !regNik.trim() || !regEmail.trim() || !regPassword.trim()) {
-      setLoginError('Mohon lengkapi seluruh kolom formulir registrasi.');
+    if (!regName.trim() || !regNik.trim() || !regEmail.trim() || !regPassword.trim() || !regVillage.trim()) {
+      setLoginError('Mohon lengkapi formulir registrasi termasuk nama desa/kelurahan.');
       return;
     }
 
@@ -115,6 +214,9 @@ export const AuthView: React.FC<AuthViewProps> = ({
         nik: regNik,
         village_code: regVillageCode,
         village_name: regVillage,
+        district: regDistrict,
+        regency: regRegency,
+        province: regProvince,
       });
 
       if (result.success && result.user) {
@@ -358,7 +460,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                       <label className="text-xs font-bold text-slate-700 block">Kata Sandi:</label>
                       <button
                         type="button"
-                        onClick={() => alert('Fitur pemulihan kata sandi dapat menghubungi administrator desa/Diskominfo setempat.')}
+                        onClick={() => setShowForgotPasswordDialog(true)}
                         className="text-[11px] text-emerald-700 hover:underline font-semibold"
                       >
                         Lupa Kata Sandi?
@@ -376,7 +478,9 @@ export const AuthView: React.FC<AuthViewProps> = ({
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                        tabIndex={-1}
+                        title={showPassword ? "Sembunyikan kata sandi" : "Lihat kata sandi"}
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -486,25 +590,212 @@ export const AuthView: React.FC<AuthViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Nama Desa & Kode */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div className="space-y-1">
-                      <label className="font-bold text-slate-700 block">Nama Desa / Kelurahan:</label>
-                      <input
-                        type="text"
-                        value={regVillage}
-                        onChange={(e) => setRegVillage(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-emerald-500"
-                      />
+                  {/* Bantuan Pemilih Wilayah Indonesia */}
+                  <div className="bg-emerald-50/70 border border-emerald-200/90 rounded-2xl p-3 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-emerald-950 font-bold text-xs">
+                        <Compass className="w-4 h-4 text-emerald-600 animate-spin-slow" />
+                        <span>Pilih dari Database Wilayah Kemendagri RI</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={toggleWilayahPicker}
+                        className="px-2.5 py-1 rounded-lg bg-white border border-emerald-300 font-bold text-emerald-800 hover:bg-emerald-100 text-[11px] shadow-xs transition-all"
+                      >
+                        {showWilayahPicker ? 'Tutup Pilihan' : 'Tarik Data Desa'}
+                      </button>
                     </div>
-                    <div className="space-y-1">
-                      <label className="font-bold text-slate-700 block">Kode Wilayah Kemendagri:</label>
-                      <input
-                        type="text"
-                        value={regVillageCode}
-                        onChange={(e) => setRegVillageCode(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-emerald-500"
-                      />
+
+                    <p className="text-[11px] text-emerald-800/80 leading-relaxed">
+                      Pilih wilayah kerja secara hierarkis (Provinsi &rarr; Kab/Kota &rarr; Kecamatan &rarr; Desa) untuk otomatis mengisi seluruh data administrasi.
+                    </p>
+
+                    {showWilayahPicker && (
+                      <div className="space-y-2.5 pt-2 border-t border-emerald-200/60">
+                        {/* Search Filter input */}
+                        <div className="relative">
+                          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            value={searchWilayah}
+                            onChange={(e) => setSearchWilayah(e.target.value)}
+                            placeholder="Ketik untuk filter nama daerah..."
+                            className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-emerald-200 bg-white text-xs placeholder:text-slate-400 focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-600 block mb-0.5">1. Provinsi:</label>
+                            <select
+                              value={selProvId}
+                              onChange={(e) => handleProvChange(e.target.value)}
+                              className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white font-medium text-[11px] focus:outline-none focus:border-emerald-500"
+                            >
+                              <option value="">-- Pilih Provinsi --</option>
+                              {provinces
+                                .filter((p) => !searchWilayah || p.name.toLowerCase().includes(searchWilayah.toLowerCase()))
+                                .map((p) => (
+                                  <option key={p.id} value={p.id}>
+                                    {toTitleCase(p.name)}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-600 block mb-0.5">2. Kabupaten / Kota:</label>
+                            <select
+                              value={selRegId}
+                              onChange={(e) => handleRegChange(e.target.value)}
+                              disabled={!selProvId}
+                              className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white font-medium text-[11px] focus:outline-none focus:border-emerald-500 disabled:opacity-50"
+                            >
+                              <option value="">-- Pilih Kab/Kota --</option>
+                              {regencies
+                                .filter((r) => !searchWilayah || r.name.toLowerCase().includes(searchWilayah.toLowerCase()))
+                                .map((r) => (
+                                  <option key={r.id} value={r.id}>
+                                    {toTitleCase(r.name)}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-600 block mb-0.5">3. Kecamatan:</label>
+                            <select
+                              value={selDistId}
+                              onChange={(e) => handleDistChange(e.target.value)}
+                              disabled={!selRegId}
+                              className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white font-medium text-[11px] focus:outline-none focus:border-emerald-500 disabled:opacity-50"
+                            >
+                              <option value="">-- Pilih Kecamatan --</option>
+                              {districts
+                                .filter((d) => !searchWilayah || d.name.toLowerCase().includes(searchWilayah.toLowerCase()))
+                                .map((d) => (
+                                  <option key={d.id} value={d.id}>
+                                    {toTitleCase(d.name)}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-600 block mb-0.5">4. Desa / Kelurahan:</label>
+                            <select
+                              value={selVilId}
+                              onChange={(e) => handleVilChange(e.target.value)}
+                              disabled={!selDistId}
+                              className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white font-medium text-[11px] focus:outline-none focus:border-emerald-500 disabled:opacity-50"
+                            >
+                              <option value="">-- Pilih Desa/Kelurahan --</option>
+                              {villages
+                                .filter((v) => !searchWilayah || v.name.toLowerCase().includes(searchWilayah.toLowerCase()))
+                                .map((v) => (
+                                  <option key={v.id} value={v.id}>
+                                    {toTitleCase(v.name)}
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+
+                          {loadingWilayah && (
+                            <div className="sm:col-span-2 text-center text-[10px] text-emerald-700 animate-pulse font-semibold">
+                              Memuat data wilayah...
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Kartu Ringkasan Wilayah Terpilih */}
+                  {regVillage && (
+                    <div className="bg-emerald-50/90 border border-emerald-300 rounded-xl p-3 flex items-start gap-2.5 animate-fade-in">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                        <MapPin className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-bold text-emerald-950 text-xs truncate">
+                            {regVillage}
+                          </p>
+                          {regVillageCode && (
+                            <span className="text-[10px] font-mono bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-md font-semibold shrink-0">
+                              Kode: {regVillageCode}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-emerald-800 font-medium mt-0.5">
+                          {[regDistrict, regRegency, regProvince].filter(Boolean).join(' • ') || 'Wilayah kedaerahan'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Form Detail Lengkap Wilayah */}
+                  <div className="space-y-2.5 pt-1">
+                    <div className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Data Wilayah Administrasi Pemerintahan:</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div className="space-y-1">
+                        <label className="font-bold text-slate-700 block">Nama Desa / Kelurahan:</label>
+                        <input
+                          type="text"
+                          required
+                          value={regVillage}
+                          onChange={(e) => setRegVillage(e.target.value)}
+                          placeholder="Contoh: Desa Sukamaju"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="font-bold text-slate-700 block">Kode Wilayah Kemendagri:</label>
+                        <input
+                          type="text"
+                          value={regVillageCode}
+                          onChange={(e) => setRegVillageCode(e.target.value)}
+                          placeholder="Contoh: 32.01.01.2005"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-emerald-500 font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="space-y-1">
+                        <label className="font-bold text-slate-700 block text-[10px]">Kecamatan:</label>
+                        <input
+                          type="text"
+                          value={regDistrict}
+                          onChange={(e) => setRegDistrict(e.target.value)}
+                          placeholder="Contoh: Kecamatan Ciawi"
+                          className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-emerald-500 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="font-bold text-slate-700 block text-[10px]">Kabupaten / Kota:</label>
+                        <input
+                          type="text"
+                          value={regRegency}
+                          onChange={(e) => setRegRegency(e.target.value)}
+                          placeholder="Contoh: Kabupaten Bogor"
+                          className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-emerald-500 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="font-bold text-slate-700 block text-[10px]">Provinsi:</label>
+                        <input
+                          type="text"
+                          value={regProvince}
+                          onChange={(e) => setRegProvince(e.target.value)}
+                          placeholder="Contoh: Jawa Barat"
+                          className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-emerald-500 text-xs"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -512,23 +803,45 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div className="space-y-1">
                       <label className="font-bold text-slate-700 block">Kata Sandi:</label>
-                      <input
-                        type="password"
-                        value={regPassword}
-                        onChange={(e) => setRegPassword(e.target.value)}
-                        placeholder="Minimal 6 karakter"
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-emerald-500"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showRegPassword ? 'text' : 'password'}
+                          value={regPassword}
+                          onChange={(e) => setRegPassword(e.target.value)}
+                          placeholder="Minimal 6 karakter"
+                          className="w-full pl-3 pr-10 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-emerald-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowRegPassword(!showRegPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                          tabIndex={-1}
+                          title={showRegPassword ? "Sembunyikan kata sandi" : "Lihat kata sandi"}
+                        >
+                          {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                     <div className="space-y-1">
                       <label className="font-bold text-slate-700 block">Ulangi Sandi:</label>
-                      <input
-                        type="password"
-                        value={regConfirmPassword}
-                        onChange={(e) => setRegConfirmPassword(e.target.value)}
-                        placeholder="Ulangi kata sandi"
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-emerald-500"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showRegConfirmPassword ? 'text' : 'password'}
+                          value={regConfirmPassword}
+                          onChange={(e) => setRegConfirmPassword(e.target.value)}
+                          placeholder="Ulangi kata sandi"
+                          className="w-full pl-3 pr-10 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-emerald-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowRegConfirmPassword(!showRegConfirmPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                          tabIndex={-1}
+                          title={showRegConfirmPassword ? "Sembunyikan kata sandi" : "Lihat kata sandi"}
+                        >
+                          {showRegConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -575,6 +888,15 @@ export const AuthView: React.FC<AuthViewProps> = ({
           </div>
         </div>
       </div>
+
+      <CustomDialog
+        isOpen={showForgotPasswordDialog}
+        onClose={() => setShowForgotPasswordDialog(false)}
+        type="info"
+        title="Pemulihan Akses Pamong Desa"
+        message="Untuk menjaga kerahasiaan dan integritas data kependudukan desa, pemulihan akun aparatur desa dapat dikoordinasikan langsung melalui Administrator Diskominfo Kabupaten atau pengurus teknis desa Anda."
+        confirmText="Saya Mengerti"
+      />
     </div>
   );
 };

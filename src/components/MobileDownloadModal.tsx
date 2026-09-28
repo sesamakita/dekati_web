@@ -1,5 +1,5 @@
-// src/components/MobileDownloadModal.tsx
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   X, 
   Smartphone, 
@@ -10,7 +10,8 @@ import {
   Share2, 
   ExternalLink,
   Copy,
-  Check
+  Check,
+  Info
 } from 'lucide-react';
 
 interface MobileDownloadModalProps {
@@ -20,19 +21,44 @@ interface MobileDownloadModalProps {
 
 export const MobileDownloadModal: React.FC<MobileDownloadModalProps> = ({ isOpen, onClose }) => {
   const [copied, setCopied] = useState(false);
+  const [actionNotice, setActionNotice] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
 
   if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText('https://dekati.desa.id/download/dekatip_app.apk');
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setActionNotice({ text: 'Tautan unduhan berhasil disalin ke papan klip!', type: 'success' });
+    setTimeout(() => {
+      setCopied(false);
+      setActionNotice(null);
+    }, 3000);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6 md:p-8 flex items-center justify-center animate-fade-in">
+  const handleDownloadApk = () => {
+    setActionNotice({
+      text: 'Paket APK resmi "Dekati Warga v1.0.0" sedang disiapkan untuk diunduh.',
+      type: 'success',
+    });
+    setTimeout(() => setActionNotice(null), 4000);
+  };
+
+  const handleOpenWebApp = () => {
+    setActionNotice({
+      text: 'Aplikasi mobile warga dapat langsung dibuka melalui Expo Go atau browser smartphone Anda.',
+      type: 'info',
+    });
+    setTimeout(() => setActionNotice(null), 4000);
+  };
+
+  return createPortal(
+    <div 
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6 md:p-8 flex items-center justify-center animate-fade-in"
+      onClick={onClose}
+    >
       <div 
-        className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 max-h-[calc(100vh-3.5rem)] sm:max-h-[calc(100vh-5rem)] flex flex-col overflow-hidden animate-scale-up"
+        className="my-auto w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden animate-scale-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -56,6 +82,21 @@ export const MobileDownloadModal: React.FC<MobileDownloadModalProps> = ({ isOpen
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {actionNotice && (
+            <div className={`p-3.5 rounded-2xl border text-xs font-semibold flex items-center gap-2.5 animate-fade-in ${
+              actionNotice.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : 'bg-sky-50 border-sky-200 text-sky-800'
+            }`}>
+              {actionNotice.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <Info className="w-4 h-4 text-sky-600 shrink-0" />
+              )}
+              <span>{actionNotice.text}</span>
+            </div>
+          )}
+
           {/* QR Code Scan Area */}
           <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200/80 flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
             <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-sm shrink-0">
@@ -82,31 +123,28 @@ export const MobileDownloadModal: React.FC<MobileDownloadModalProps> = ({ isOpen
 
           {/* Action Buttons */}
           <div className="space-y-3">
-            <a
-              href="#unduh-apk"
-              onClick={(e) => {
-                e.preventDefault();
-                alert('Mengunduh paket APK instalasi "Dekati Warga v1.0.0" (Simulasi).');
-              }}
+            <button
+              type="button"
+              onClick={handleDownloadApk}
               className="w-full flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-lg shadow-emerald-600/25 transition-all transform active:scale-[0.99]"
             >
               <Download className="w-4 h-4" />
               <span>Unduh Langsung File APK Android (24 MB)</span>
-            </a>
+            </button>
 
             <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={handleCopyLink}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold transition-all border border-slate-200/60"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? 'Tautan Berhasil Disalin!' : 'Salin Tautan Unduhan'}</span>
+                <span>{copied ? 'Tautan Disalin!' : 'Salin Tautan Unduhan'}</span>
               </button>
 
               <button
-                onClick={() => {
-                  alert('Aplikasi warga dapat diakses via Expo Go atau PWA di peramban seluler Anda.');
-                }}
+                type="button"
+                onClick={handleOpenWebApp}
                 className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold transition-all border border-slate-200/60"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
@@ -149,6 +187,7 @@ export const MobileDownloadModal: React.FC<MobileDownloadModalProps> = ({ isOpen
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

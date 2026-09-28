@@ -28,9 +28,9 @@ export const CitizensView: React.FC = () => {
   const filteredCitizens = citizens.filter((c) => {
     const matchesTab = activeTab === 'all' ? true : !c.is_verified;
     const matchesSearch =
-      c.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.nik.includes(searchQuery) ||
-      c.no_kk.includes(searchQuery);
+      (c.nama_lengkap || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.nik || '').includes(searchQuery) ||
+      (c.no_kk || '').includes(searchQuery);
     const matchesDusun = selectedDusun === 'all' ? true : c.dusun === selectedDusun;
 
     return matchesTab && matchesSearch && matchesDusun;
@@ -41,7 +41,7 @@ export const CitizensView: React.FC = () => {
     const rows = citizens
       .map(
         (c) =>
-          `"${c.id}","${c.nik}","${c.no_kk}","${c.nama_lengkap}","${c.jenis_kelamin}","${c.status_dalam_keluarga}","${c.dusun}","${c.rt}","${c.rw}","${c.is_verified ? 'Ya' : 'Belum'}"`
+          `"${c.id}","${c.nik || ''}","${c.no_kk || ''}","${c.nama_lengkap || ''}","${c.jenis_kelamin || ''}","${c.status_dalam_keluarga || ''}","${c.dusun || ''}","${c.rt || ''}","${c.rw || ''}","${c.is_verified ? 'Ya' : 'Belum'}"`
       )
       .join('\n');
 
@@ -128,9 +128,11 @@ export const CitizensView: React.FC = () => {
             className="px-3 py-2 bg-slate-50 text-xs font-bold text-slate-700 rounded-xl border border-slate-200 focus:outline-none"
           >
             <option value="all">Semua Dusun</option>
-            <option value="Dusun Mekar">Dusun Mekar</option>
-            <option value="Dusun Krajan">Dusun Krajan</option>
-            <option value="Dusun Sukahening">Dusun Sukahening</option>
+            {Array.from(new Set(citizens.map((c) => c.dusun).filter(Boolean))).map((dusun) => (
+              <option key={dusun} value={dusun}>
+                {dusun}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -167,23 +169,25 @@ export const CitizensView: React.FC = () => {
                   >
                   <td className="py-4 px-5 font-mono">
                     <div className="font-bold text-slate-900">{citizen.nik}</div>
-                    <div className="text-[11px] text-slate-400">KK: {citizen.no_kk}</div>
+                    <div className="text-[11px] text-slate-400">KK: {citizen.no_kk || '-'}</div>
                   </td>
                   <td className="py-4 px-4">
                     <div className="font-bold text-slate-900">{citizen.nama_lengkap}</div>
                     <div className="text-[11px] text-slate-500">
-                      {citizen.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'} • {citizen.tempat_lahir}, {citizen.tanggal_lahir}
+                      {citizen.jenis_kelamin === 'L' ? 'Laki-laki' : citizen.jenis_kelamin === 'P' ? 'Perempuan' : '-'} • {[citizen.tempat_lahir, citizen.tanggal_lahir].filter(Boolean).join(', ') || '-'}
                     </div>
                   </td>
                   <td className="py-4 px-4 font-semibold text-slate-700">
-                    {citizen.status_dalam_keluarga}
+                    {citizen.status_dalam_keluarga || '-'}
                   </td>
                   <td className="py-4 px-4 text-slate-600">
-                    <div className="font-semibold text-slate-800">{citizen.dusun}</div>
-                    <div className="text-[11px] text-slate-500">RT {citizen.rt} / RW {citizen.rw}</div>
+                    <div className="font-semibold text-slate-800">{citizen.dusun || '-'}</div>
+                    <div className="text-[11px] text-slate-500">
+                      {(citizen.rt || citizen.rw) ? `RT ${citizen.rt || '-'} / RW ${citizen.rw || '-'}` : '-'}
+                    </div>
                   </td>
                   <td className="py-4 px-4 text-slate-600">
-                    {citizen.pekerjaan}
+                    {citizen.pekerjaan || '-'}
                   </td>
                   <td className="py-4 px-4">
                     {citizen.is_verified ? (

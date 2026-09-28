@@ -1,5 +1,5 @@
 // src/components/Sidebar.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -14,6 +14,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
+import { CustomDialog } from './CustomDialog';
 
 export type NavTab = 'dashboard' | 'letters' | 'complaints' | 'citizens' | 'announcements' | 'events' | 'apbdes';
 
@@ -25,6 +26,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab, onOpenLanding }) => {
   const { letters, complaints, citizens, resetAllData } = useData();
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const pendingLettersCount = letters.filter(
     (l) => l.status === 'submitted' || l.status === 'in_verification'
@@ -177,16 +179,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab, onOpen
 
         {/* Reset Mock Data button */}
         <button
-          onClick={() => {
-            if (window.confirm('Reset data simulasi ke awal?')) {
-              resetAllData();
-            }
-          }}
+          onClick={() => setShowResetConfirm(true)}
           className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all"
         >
           <RotateCcw className="w-3.5 h-3.5" />
           Reset Data Demo
         </button>
+
+        <CustomDialog
+          isOpen={showResetConfirm}
+          onClose={() => setShowResetConfirm(false)}
+          type="warning"
+          title="Reset Data Simulasi"
+          message="Apakah Anda yakin ingin mengatur ulang data demo simulasi ke kondisi awal? Seluruh perubahan lokal akan dikembalikan."
+          confirmText="Ya, Reset Data"
+          cancelText="Batal"
+          showCancel={true}
+          onConfirm={() => resetAllData()}
+        />
 
         <div className="text-center text-[10px] text-slate-400 font-medium">
           Dekati Web Admin v1.0.0 • Pemerintahan Desa

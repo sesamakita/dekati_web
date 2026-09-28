@@ -1,5 +1,5 @@
-// src/components/QrVerifyModal.tsx
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { 
   ShieldCheck, 
   X, 
@@ -30,9 +30,17 @@ export const QrVerifyModal: React.FC<QrVerifyModalProps> = ({ letter, onClose })
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-3xl max-w-md w-full max-h-[calc(100vh-3.5rem)] sm:max-h-[calc(100vh-5rem)] overflow-y-auto p-6 sm:p-7 shadow-2xl border border-slate-100 relative">
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
+      onClick={onClose}
+    >
+      <div 
+        className="my-auto bg-white rounded-3xl max-w-md w-full max-h-[calc(100vh-3.5rem)] sm:max-h-[calc(100vh-5rem)] overflow-y-auto p-6 sm:p-7 shadow-2xl border border-slate-100 relative"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
@@ -128,6 +136,7 @@ export const QrVerifyModal: React.FC<QrVerifyModalProps> = ({ letter, onClose })
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

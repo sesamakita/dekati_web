@@ -4,6 +4,7 @@ import {
   Complaint,
   Announcement,
   ApbdesData,
+  ApbdesItem,
   VillageProfile,
   LetterStatus,
   ComplaintStatus,
@@ -44,6 +45,7 @@ type Listener = () => void;
 class DataService {
   private listeners: Set<Listener> = new Set();
   public isSupabaseConnected: boolean = false;
+  private cache: Record<string, any> = {};
 
   constructor() {
     this.syncFromSupabase();
@@ -63,16 +65,23 @@ class DataService {
 
   // Helper storage
   private getStorage<T>(key: string, fallback: T): T {
+    if (this.cache[key] !== undefined) {
+      return this.cache[key];
+    }
     try {
       const data = localStorage.getItem(key);
-      return data ? JSON.parse(data) : fallback;
+      const parsed = data ? JSON.parse(data) : fallback;
+      this.cache[key] = parsed;
+      return parsed;
     } catch {
+      this.cache[key] = fallback;
       return fallback;
     }
   }
 
   private setStorage<T>(key: string, value: T): void {
     try {
+      this.cache[key] = value;
       localStorage.setItem(key, JSON.stringify(value));
       this.notify();
     } catch (e) {
@@ -158,6 +167,53 @@ class DataService {
 
       if (!evtErr && evtData && evtData.length > 0) {
         this.setStorage(STORAGE_KEYS.VILLAGE_EVENTS, evtData);
+        this.isSupabaseConnected = true;
+      }
+
+      // 8. Check APBDes items
+      const { data: apbData, error: apbErr } = await supabase
+        .from('apbdes_items')
+        .select('*');
+
+      if (!apbErr && apbData && apbData.length > 0) {
+        const fiscalYear = apbData[0].fiscal_year || new Date().getFullYear();
+        const pendapatanItems = apbData.filter((i: any) => i.type === 'pendapatan');
+        const belanjaItems = apbData.filter((i: any) => i.type === 'belanja');
+
+        const pBudget = pendapatanItems.reduce((s: number, i: any) => s + (Number(i.budget_amount) || 0), 0);
+        const pRealized = pendapatanItems.reduce((s: number, i: any) => s + (Number(i.realized_amount) || 0), 0);
+        const bBudget = belanjaItems.reduce((s: number, i: any) => s + (Number(i.budget_amount) || 0), 0);
+        const bRealized = belanjaItems.reduce((s: number, i: any) => s + (Number(i.realized_amount) || 0), 0);
+        const totalB = pBudget + bBudget;
+        const totalR = pRealized + bRealized;
+
+        const fullApb: ApbdesData = {
+          fiscal_year: fiscalYear,
+          pendapatan: {
+            total_budget: pBudget,
+            total_realized: pRealized,
+            items: pendapatanItems.map((i: any) => ({
+              account_code: i.account_code,
+              name: i.name,
+              budget_amount: Number(i.budget_amount) || 0,
+              realized_amount: Number(i.realized_amount) || 0,
+              percentage: Number(i.percentage) || 0
+            }))
+          },
+          belanja: {
+            total_budget: bBudget,
+            total_realized: bRealized,
+            items: belanjaItems.map((i: any) => ({
+              account_code: i.account_code,
+              name: i.name,
+              budget_amount: Number(i.budget_amount) || 0,
+              realized_amount: Number(i.realized_amount) || 0,
+              percentage: Number(i.percentage) || 0
+            }))
+          },
+          realisasi_persen: totalB > 0 ? Number(((totalR / totalB) * 100).toFixed(1)) : 0
+        };
+        this.setStorage(STORAGE_KEYS.APBDES, fullApb);
         this.isSupabaseConnected = true;
       }
 
@@ -298,6 +354,23 @@ class DataService {
             }
           }
         )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'village_profiles' },
+          (payload) => {
+            if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+              const updated = payload.new as VillageProfile;
+              this.setStorage(STORAGE_KEYS.PROFILE, updated);
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'apbdes_items' },
+          () => {
+            this.syncFromSupabase();
+          }
+        )
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             this.isSupabaseConnected = true;
@@ -329,15 +402,37 @@ class DataService {
     const updated = { ...current, ...profile };
     this.setStorage(STORAGE_KEYS.PROFILE, updated);
 
-    // Sync to Supabase
+    // Sync to Supabase: Multi-desa by code
     try {
-      await supabase
-        .from('village_profiles')
-        .upsert({ id: 1, ...updated, updated_at: new Date().toISOString() });
+      if (updated.code) {
+        const { data: existing } = await supabase
+          .from('village_profiles')
+          .select('id')
+          .eq('code', updated.code)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase
+            .from('village_profiles')
+            .update({ ...updated, updated_at: new Date().toISOString() })
+            .eq('id', existing.id);
+        } else {
+          // Buat record desa baru di tabel village_profiles
+          const { id: _, ...insertData } = updated as any;
+          await supabase
+            .from('village_profiles')
+            .insert([{ ...insertData, updated_at: new Date().toISOString() }]);
+        }
+      } else {
+        await supabase
+          .from('village_profiles')
+          .upsert({ id: 1, ...updated, updated_at: new Date().toISOString() });
+      }
     } catch (e) {
       console.warn('Supabase profile update offline', e);
     }
 
+    this.notify();
     return updated;
   }
 
@@ -631,40 +726,140 @@ class DataService {
     return this.getStorage(STORAGE_KEYS.APBDES, initialApbdes);
   }
 
+  async saveFullApbdes(apbdes: ApbdesData): Promise<ApbdesData> {
+    const pendapatanItems = (apbdes.pendapatan?.items || []).map((i) => {
+      const budget = Number(i.budget_amount) || 0;
+      const realized = Number(i.realized_amount) || 0;
+      return {
+        account_code: i.account_code || '',
+        name: i.name || '',
+        budget_amount: budget,
+        realized_amount: realized,
+        percentage: budget > 0 ? Number(((realized / budget) * 100).toFixed(1)) : 0
+      };
+    });
+
+    const belanjaItems = (apbdes.belanja?.items || []).map((i) => {
+      const budget = Number(i.budget_amount) || 0;
+      const realized = Number(i.realized_amount) || 0;
+      return {
+        account_code: i.account_code || '',
+        name: i.name || '',
+        budget_amount: budget,
+        realized_amount: realized,
+        percentage: budget > 0 ? Number(((realized / budget) * 100).toFixed(1)) : 0
+      };
+    });
+
+    const pBudget = pendapatanItems.reduce((s, i) => s + i.budget_amount, 0);
+    const pRealized = pendapatanItems.reduce((s, i) => s + i.realized_amount, 0);
+    const bBudget = belanjaItems.reduce((s, i) => s + i.budget_amount, 0);
+    const bRealized = belanjaItems.reduce((s, i) => s + i.realized_amount, 0);
+    const totalB = pBudget + bBudget;
+    const totalR = pRealized + bRealized;
+
+    const updatedApbdes: ApbdesData = {
+      fiscal_year: Number(apbdes.fiscal_year) || new Date().getFullYear(),
+      pendapatan: {
+        total_budget: pBudget,
+        total_realized: pRealized,
+        items: pendapatanItems
+      },
+      belanja: {
+        total_budget: bBudget,
+        total_realized: bRealized,
+        items: belanjaItems
+      },
+      realisasi_persen: totalB > 0 ? Number(((totalR / totalB) * 100).toFixed(1)) : 0
+    };
+
+    this.setStorage(STORAGE_KEYS.APBDES, updatedApbdes);
+
+    // Sync to Supabase apbdes_items
+    try {
+      await supabase.from('apbdes_items').delete().neq('id', 0); // clear all
+
+      const rowsToInsert = [
+        ...pendapatanItems.map((i) => ({
+          fiscal_year: updatedApbdes.fiscal_year,
+          type: 'pendapatan',
+          account_code: i.account_code,
+          name: i.name,
+          budget_amount: i.budget_amount,
+          realized_amount: i.realized_amount,
+          percentage: i.percentage
+        })),
+        ...belanjaItems.map((i) => ({
+          fiscal_year: updatedApbdes.fiscal_year,
+          type: 'belanja',
+          account_code: i.account_code,
+          name: i.name,
+          budget_amount: i.budget_amount,
+          realized_amount: i.realized_amount,
+          percentage: i.percentage
+        }))
+      ];
+
+      if (rowsToInsert.length > 0) {
+        await supabase.from('apbdes_items').insert(rowsToInsert);
+      }
+    } catch (e) {
+      console.warn('Supabase apbdes sync offline', e);
+    }
+
+    this.notify();
+    return updatedApbdes;
+  }
+
   async updateApbdesItem(
     type: 'pendapatan' | 'belanja',
     accountCode: string,
     realizedAmount: number
   ) {
     const apbdes = this.getApbdes();
-    const target = apbdes[type];
-    const item = target.items.find((i) => i.account_code === accountCode);
+    const item = apbdes[type].items.find((i) => i.account_code === accountCode);
     if (item) {
       item.realized_amount = realizedAmount;
-      item.percentage = Number(((realizedAmount / item.budget_amount) * 100).toFixed(1));
     }
+    return this.saveFullApbdes(apbdes);
+  }
 
-    target.total_realized = target.items.reduce((sum, i) => sum + i.realized_amount, 0);
-    const totalBudget = apbdes.pendapatan.total_budget + apbdes.belanja.total_budget;
-    const totalRealized = apbdes.pendapatan.total_realized + apbdes.belanja.total_realized;
-    apbdes.realisasi_persen = Number(((totalRealized / totalBudget) * 100).toFixed(1));
+  async addApbdesItem(
+    type: 'pendapatan' | 'belanja',
+    item: Omit<ApbdesItem, 'percentage'>
+  ) {
+    const apbdes = this.getApbdes();
+    const newItem: ApbdesItem = {
+      ...item,
+      percentage: Number(item.budget_amount) > 0 ? Number(((item.realized_amount / item.budget_amount) * 100).toFixed(1)) : 0
+    };
+    apbdes[type].items.push(newItem);
+    return this.saveFullApbdes(apbdes);
+  }
 
-    this.setStorage(STORAGE_KEYS.APBDES, apbdes);
+  async deleteApbdesItem(
+    type: 'pendapatan' | 'belanja',
+    accountCode: string
+  ) {
+    const apbdes = this.getApbdes();
+    apbdes[type].items = apbdes[type].items.filter((i) => i.account_code !== accountCode);
+    return this.saveFullApbdes(apbdes);
+  }
 
-    // Sync to Supabase
-    try {
-      await supabase
-        .from('apbdes_items')
-        .update({
-          realized_amount: realizedAmount,
-          percentage: item?.percentage || 0
-        })
-        .eq('account_code', accountCode);
-    } catch (e) {
-      console.warn('Supabase apbdes update offline', e);
+  async updateApbdesItemFull(
+    type: 'pendapatan' | 'belanja',
+    accountCode: string,
+    updatedFields: Partial<ApbdesItem>
+  ) {
+    const apbdes = this.getApbdes();
+    const idx = apbdes[type].items.findIndex((i) => i.account_code === accountCode);
+    if (idx !== -1) {
+      apbdes[type].items[idx] = {
+        ...apbdes[type].items[idx],
+        ...updatedFields
+      };
     }
-
-    return apbdes;
+    return this.saveFullApbdes(apbdes);
   }
 
   // ==========================================
@@ -889,6 +1084,30 @@ class DataService {
         const user = data[0] as VillageOfficial;
         this.setStorage(STORAGE_KEYS.CURRENT_OFFICIAL, user);
         this.setActiveRole(user.role === 'kades' || user.role === 'lurah' ? 'kades' : 'admin_desa');
+
+        if (user.village_code) {
+          try {
+            const { data: dbProfile } = await supabase
+              .from('village_profiles')
+              .select('*')
+              .eq('code', user.village_code)
+              .maybeSingle();
+
+            if (dbProfile) {
+              this.setStorage(STORAGE_KEYS.PROFILE, dbProfile);
+            }
+          } catch (e) {
+            console.warn('[Dekati Auth] Failed to fetch village profile:', e);
+          }
+        }
+
+        if (user.village_name && user.village_name !== 'Pemerintah Desa') {
+          this.updateVillageProfile({
+            name: user.village_name,
+            code: user.village_code || '',
+            ...(user.role === 'kades' || user.role === 'lurah' ? { kades_name: user.nama_lengkap } : {})
+          });
+        }
         return { success: true, user };
       }
 
@@ -907,6 +1126,13 @@ class DataService {
     if (matched) {
       this.setStorage(STORAGE_KEYS.CURRENT_OFFICIAL, matched);
       this.setActiveRole(matched.role === 'kades' || matched.role === 'lurah' ? 'kades' : 'admin_desa');
+      if (matched.village_name && matched.village_name !== 'Pemerintah Desa') {
+        this.updateVillageProfile({
+          name: matched.village_name,
+          code: matched.village_code || '',
+          ...(matched.role === 'kades' || matched.role === 'lurah' ? { kades_name: matched.nama_lengkap } : {})
+        });
+      }
       return { success: true, user: matched };
     }
 
@@ -924,6 +1150,9 @@ class DataService {
     nik: string;
     village_code?: string;
     village_name?: string;
+    district?: string;
+    regency?: string;
+    province?: string;
     phone?: string;
   }): Promise<{ success: boolean; user?: VillageOfficial; error?: string }> {
     const cleanEmail = payload.email.trim().toLowerCase();
@@ -960,6 +1189,17 @@ class DataService {
           this.setStorage(STORAGE_KEYS.OFFICIALS_LIST, localOfficials);
         }
 
+        if (payload.village_name || payload.district) {
+          this.updateVillageProfile({
+            name: payload.village_name || 'Pemerintah Desa',
+            code: payload.village_code || '',
+            district: payload.district || '',
+            regency: payload.regency || '',
+            province: payload.province || '',
+            ...(payload.role === 'kades' || payload.role === 'lurah' ? { kades_name: payload.nama } : {})
+          });
+        }
+
         return { success: true, user: newUser };
       }
 
@@ -987,6 +1227,17 @@ class DataService {
     localOfficials.push(fallbackUser);
     this.setStorage(STORAGE_KEYS.OFFICIALS_LIST, localOfficials);
 
+    if (payload.village_name || payload.district) {
+      this.updateVillageProfile({
+        name: payload.village_name || 'Pemerintah Desa',
+        code: payload.village_code || '',
+        district: payload.district || '',
+        regency: payload.regency || '',
+        province: payload.province || '',
+        ...(payload.role === 'kades' || payload.role === 'lurah' ? { kades_name: payload.nama } : {})
+      });
+    }
+
     return { success: true, user: fallbackUser };
   }
 
@@ -995,12 +1246,14 @@ class DataService {
   }
 
   logoutOfficial() {
+    delete this.cache[STORAGE_KEYS.CURRENT_OFFICIAL];
     localStorage.removeItem(STORAGE_KEYS.CURRENT_OFFICIAL);
     this.notify();
   }
 
   // Reset to initial mock data
   resetAllData() {
+    this.cache = {};
     localStorage.removeItem(STORAGE_KEYS.CITIZENS);
     localStorage.removeItem(STORAGE_KEYS.LETTERS);
     localStorage.removeItem(STORAGE_KEYS.COMPLAINTS);

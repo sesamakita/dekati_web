@@ -120,16 +120,9 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterAdmin }
             <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-md shadow-emerald-600/25 shrink-0">
               <Building2 className="w-6 h-6" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xl font-extrabold text-slate-900 tracking-tight">Dekati</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                  Desa & Kelurahan Terpadu
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 font-medium">
-                {profile.name} • {profile.district}, {profile.regency}
-              </p>
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-extrabold text-slate-900 tracking-tight">Dekati</span>
+              
             </div>
           </div>
 

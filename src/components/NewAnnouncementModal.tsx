@@ -1,11 +1,13 @@
 // src/components/NewAnnouncementModal.tsx
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   X, 
   Radio, 
   Send, 
   Smartphone, 
-  AlertTriangle 
+  AlertTriangle,
+  AlertCircle
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { TargetAudienceType } from '../types';
@@ -23,11 +25,12 @@ export const NewAnnouncementModal: React.FC<NewAnnouncementModalProps> = ({ onCl
   const [targetType, setTargetType] = useState<TargetAudienceType>('all');
   const [targetValue, setTargetValue] = useState('');
   const [isUrgent, setIsUrgent] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) {
-      alert('Mohon lengkapi judul dan rincian pengumuman.');
+      setErrorMsg('Mohon lengkapi judul dan rincian pengumuman.');
       return;
     }
 
@@ -45,10 +48,18 @@ export const NewAnnouncementModal: React.FC<NewAnnouncementModalProps> = ({ onCl
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div 
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 md:p-8 bg-slate-950/70 backdrop-blur-sm animate-fade-in"
+      onClick={onClose}
+    >
       {/* Modal Container: Max-height with safe viewport distance up and down */}
-      <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[calc(100vh-3.5rem)] sm:max-h-[calc(100vh-5rem)] shadow-2xl border border-slate-100 flex flex-col overflow-hidden relative">
+      <div 
+        className="bg-white rounded-3xl max-w-4xl w-full max-h-[calc(100vh-3.5rem)] sm:max-h-[calc(100vh-5rem)] shadow-2xl border border-slate-100 flex flex-col overflow-hidden relative my-auto animate-scale-up"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Fixed Header Bar */}
         <div className="shrink-0 px-6 sm:px-7 py-4 border-b border-slate-100 flex items-start justify-between bg-white">
@@ -73,6 +84,13 @@ export const NewAnnouncementModal: React.FC<NewAnnouncementModalProps> = ({ onCl
 
         {/* Scrollable Body: Form + Smartphone Preview */}
         <form id="announcement-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 sm:px-7 py-5">
+          {errorMsg ? (
+            <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl flex items-center gap-2 text-xs font-semibold animate-fade-in">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left: Input Form (7 cols) */}
             <div className="lg:col-span-7 space-y-3.5 text-xs">
@@ -271,6 +289,7 @@ export const NewAnnouncementModal: React.FC<NewAnnouncementModalProps> = ({ onCl
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

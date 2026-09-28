@@ -10,4 +10,13 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      '/api-wilayah': {
+        target: 'https://emsifa.github.io/api-wilayah-indonesia/api',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-wilayah/, ''),
+      },
+    },
+  },
 });

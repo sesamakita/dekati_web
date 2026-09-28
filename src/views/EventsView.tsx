@@ -1,5 +1,5 @@
-// src/views/EventsView.tsx
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Calendar, 
   PhoneCall, 
@@ -16,13 +16,14 @@ import {
   Flame, 
   Heart, 
   Car, 
-  X,
-  Phone,
-  Radio,
-  Tag
+  X, 
+  Phone, 
+  Radio, 
+  Tag 
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { VillageEvent, EmergencyContact } from '../types';
+import { CustomDialog } from '../components/CustomDialog';
 
 export const EventsView: React.FC = () => {
   const { 
@@ -66,6 +67,23 @@ export const EventsView: React.FC = () => {
     is_active: true
   });
 
+  // Validation Error States
+  const [eventError, setEventError] = useState<string | null>(null);
+  const [contactError, setContactError] = useState<string | null>(null);
+
+  // Custom Delete Dialog State
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean;
+    type: 'event' | 'contact';
+    id: string;
+    title: string;
+  }>({
+    isOpen: false,
+    type: 'event',
+    id: '',
+    title: '',
+  });
+
   // Filtered Events
   const filteredEvents = villageEvents.filter((evt) => {
     const matchesSearch = evt.title.toLowerCase().includes(eventSearch.toLowerCase()) ||
@@ -78,6 +96,7 @@ export const EventsView: React.FC = () => {
   // Handlers for Events
   const handleOpenAddEvent = () => {
     setEditingEvent(null);
+    setEventError(null);
     setEventForm({
       title: '',
       category: 'Kesehatan',
@@ -93,6 +112,7 @@ export const EventsView: React.FC = () => {
 
   const handleOpenEditEvent = (evt: VillageEvent) => {
     setEditingEvent(evt);
+    setEventError(null);
     setEventForm({
       title: evt.title,
       category: evt.category,
@@ -108,8 +128,8 @@ export const EventsView: React.FC = () => {
 
   const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eventForm.title || !eventForm.event_date || !eventForm.location) {
-      alert('Mohon isi judul kegiatan, tanggal, dan lokasi pelaksanaan.');
+    if (!eventForm.title.trim() || !eventForm.event_date.trim() || !eventForm.location.trim()) {
+      setEventError('Mohon isi judul kegiatan, tanggal, dan lokasi pelaksanaan.');
       return;
     }
 
@@ -121,15 +141,19 @@ export const EventsView: React.FC = () => {
     setShowEventModal(false);
   };
 
-  const handleDeleteEvent = async (id: string, title: string) => {
-    if (window.confirm(`Hapus agenda kegiatan "${title}"?`)) {
-      await deleteVillageEvent(id);
-    }
+  const handleDeleteEvent = (id: string, title: string) => {
+    setDeleteDialog({
+      isOpen: true,
+      type: 'event',
+      id,
+      title,
+    });
   };
 
   // Handlers for Emergency Contacts
   const handleOpenAddContact = () => {
     setEditingContact(null);
+    setContactError(null);
     setContactForm({
       title: '',
       phone: '',
@@ -143,6 +167,7 @@ export const EventsView: React.FC = () => {
 
   const handleOpenEditContact = (c: EmergencyContact) => {
     setEditingContact(c);
+    setContactError(null);
     setContactForm({
       title: c.title,
       phone: c.phone,
@@ -156,8 +181,8 @@ export const EventsView: React.FC = () => {
 
   const handleSaveContact = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contactForm.title || !contactForm.phone) {
-      alert('Mohon isi nama kontak dan nomor telepon darurat.');
+    if (!contactForm.title.trim() || !contactForm.phone.trim()) {
+      setContactError('Mohon isi nama layanan dan nomor telepon siaga darurat.');
       return;
     }
 
@@ -169,9 +194,20 @@ export const EventsView: React.FC = () => {
     setShowContactModal(false);
   };
 
-  const handleDeleteContact = async (id: string, title: string) => {
-    if (window.confirm(`Hapus kontak darurat "${title}"?`)) {
-      await deleteEmergencyContact(id);
+  const handleDeleteContact = (id: string, title: string) => {
+    setDeleteDialog({
+      isOpen: true,
+      type: 'contact',
+      id,
+      title,
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deleteDialog.type === 'event') {
+      await deleteVillageEvent(deleteDialog.id);
+    } else {
+      await deleteEmergencyContact(deleteDialog.id);
     }
   };
 
@@ -452,30 +488,47 @@ export const EventsView: React.FC = () => {
       {/* ============================================================== */}
       {/* MODAL: TAMBAH / EDIT AGENDA EVENT                              */}
       {/* ============================================================== */}
-      {showEventModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 overflow-hidden relative">
+      {showEventModal && typeof document !== 'undefined' && createPortal(
+        <div 
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6 flex items-center justify-center animate-fade-in"
+          onClick={() => setShowEventModal(false)}
+        >
+          <div 
+            className="my-auto bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 overflow-hidden relative"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-emerald-600" />
                 {editingEvent ? 'Ubah Agenda Kegiatan' : 'Tambah Agenda Kegiatan Desa'}
               </h3>
               <button
+                type="button"
                 onClick={() => setShowEventModal(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleSaveEvent} className="mt-4 space-y-3.5">
+              {eventError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold flex items-center gap-2 animate-fade-in">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{eventError}</span>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Judul Kegiatan *</label>
                 <input
                   type="text"
                   required
                   value={eventForm.title}
-                  onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
+                  onChange={(e) => {
+                    setEventForm({ ...eventForm, title: e.target.value });
+                    if (eventError) setEventError(null);
+                  }}
                   placeholder="Contoh: Posyandu Balita & Skrining Lansia"
                   className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 />
@@ -502,7 +555,10 @@ export const EventsView: React.FC = () => {
                     type="date"
                     required
                     value={eventForm.event_date}
-                    onChange={(e) => setEventForm({ ...eventForm, event_date: e.target.value })}
+                    onChange={(e) => {
+                      setEventForm({ ...eventForm, event_date: e.target.value });
+                      if (eventError) setEventError(null);
+                    }}
                     className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   />
                 </div>
@@ -538,7 +594,10 @@ export const EventsView: React.FC = () => {
                   type="text"
                   required
                   value={eventForm.location}
-                  onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}
+                  onChange={(e) => {
+                    setEventForm({ ...eventForm, location: e.target.value });
+                    if (eventError) setEventError(null);
+                  }}
                   placeholder="Contoh: Balai RW 01 Dusun Mekar"
                   className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 />
@@ -572,49 +631,67 @@ export const EventsView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowEventModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md shadow-emerald-600/20"
+                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md shadow-emerald-600/20 transition-all"
                 >
                   Simpan Agenda
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ============================================================== */}
       {/* MODAL: TAMBAH / EDIT KONTAK DARURAT                            */}
       {/* ============================================================== */}
-      {showContactModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 overflow-hidden relative">
+      {showContactModal && typeof document !== 'undefined' && createPortal(
+        <div 
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6 flex items-center justify-center animate-fade-in"
+          onClick={() => setShowContactModal(false)}
+        >
+          <div 
+            className="my-auto bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 overflow-hidden relative"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <PhoneCall className="w-4 h-4 text-rose-600" />
                 {editingContact ? 'Ubah Kontak Siaga Darurat' : 'Tambah Kontak Siaga Darurat'}
               </h3>
               <button
+                type="button"
                 onClick={() => setShowContactModal(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleSaveContact} className="mt-4 space-y-3.5">
+              {contactError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold flex items-center gap-2 animate-fade-in">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{contactError}</span>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Nama Layanan / Instansi *</label>
                 <input
                   type="text"
                   required
                   value={contactForm.title}
-                  onChange={(e) => setContactForm({ ...contactForm, title: e.target.value })}
+                  onChange={(e) => {
+                    setContactForm({ ...contactForm, title: e.target.value });
+                    if (contactError) setContactError(null);
+                  }}
                   placeholder="Contoh: Ambulans Siaga Desa 24 Jam"
                   className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20"
                 />
@@ -627,7 +704,10 @@ export const EventsView: React.FC = () => {
                     type="text"
                     required
                     value={contactForm.phone}
-                    onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                    onChange={(e) => {
+                      setContactForm({ ...contactForm, phone: e.target.value });
+                      if (contactError) setContactError(null);
+                    }}
                     placeholder="0812-3456-7890"
                     className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20"
                   />
@@ -688,21 +768,35 @@ export const EventsView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowContactModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-600/20"
+                  className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-600/20 transition-all"
                 >
                   Simpan Kontak
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
+
+      {/* Dialog Konfirmasi Hapus Bento */}
+      <CustomDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog((prev) => ({ ...prev, isOpen: false }))}
+        type="danger"
+        title={deleteDialog.type === 'event' ? 'Hapus Agenda Kegiatan' : 'Hapus Kontak Darurat'}
+        message={`Apakah Anda yakin ingin menghapus "${deleteDialog.title}"? Data yang telah dihapus tidak dapat dikembalikan lagi.`}
+        confirmText="Ya, Hapus Data"
+        cancelText="Batal"
+        showCancel={true}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 };

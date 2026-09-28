@@ -7,72 +7,99 @@ import {
   DollarSign, 
   CheckCircle2, 
   Edit3, 
-  Save, 
-  RotateCcw,
-  Sparkles
+  Sparkles,
+  MapPin,
+  Phone,
+  Mail,
+  UserCheck,
+  Compass,
+  Plus,
+  Trash2,
+  Calendar,
+  Layers,
+  Save
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
+import { VillageProfileModal } from '../components/VillageProfileModal';
+import { ApbdesManageModal } from '../components/ApbdesManageModal';
 
 export const ApbdesView: React.FC = () => {
-  const { apbdes, profile, updateApbdesItem, updateVillageProfile } = useData();
-  const [editingCode, setEditingCode] = useState<string | null>(null);
-  const [editAmount, setEditAmount] = useState<number>(0);
+  const { apbdes, profile, deleteApbdesItem } = useData();
 
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [kadesName, setKadesName] = useState(profile.kades_name);
-  const [sekdesName, setSekdesName] = useState(profile.sekdes_name);
-  const [officePhone, setOfficePhone] = useState(profile.office_phone);
-  const [officeAddress, setOfficeAddress] = useState(profile.office_address);
+  // Modals state
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isApbdesModalOpen, setIsApbdesModalOpen] = useState(false);
+  const [apbdesModalTab, setApbdesModalTab] = useState<'pendapatan' | 'belanja'>('pendapatan');
 
-  const handleStartEdit = (code: string, currentAmount: number) => {
-    setEditingCode(code);
-    setEditAmount(currentAmount);
+  const openApbdesPortal = (tab: 'pendapatan' | 'belanja' = 'pendapatan') => {
+    setApbdesModalTab(tab);
+    setIsApbdesModalOpen(true);
   };
 
-  const handleSaveEdit = (type: 'pendapatan' | 'belanja', code: string) => {
-    updateApbdesItem(type, code, editAmount);
-    setEditingCode(null);
-  };
-
-  const handleSaveProfile = () => {
-    updateVillageProfile({
-      kades_name: kadesName,
-      sekdes_name: sekdesName,
-      office_phone: officePhone,
-      office_address: officeAddress,
-    });
-    setIsEditingProfile(false);
-  };
+  const surplusDefisit = (apbdes.pendapatan?.total_realized || 0) - (apbdes.belanja?.total_realized || 0);
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in">
-      {/* Title */}
-      <div>
-        <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-          <PieChart className="w-5 h-5 text-violet-600" />
-          Transparansi APBDes & Profil Pemerintahan Desa
-        </h2>
-        <p className="text-xs text-slate-500 mt-1">
-          Publikasi anggaran pendapatan dan belanja desa tahun berjalan serta struktur aparatur {profile.name}.
-        </p>
+      {/* Page Title & Main Action Buttons */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+            <PieChart className="w-5 h-5 text-violet-600" />
+            Transparansi APBDes & Profil Pemerintahan Desa
+          </h2>
+          <p className="text-xs text-slate-500 mt-1">
+            Publikasi anggaran pendapatan & belanja desa tahun {apbdes.fiscal_year} serta identitas wilayah kerja {profile.name}.
+          </p>
+        </div>
+
+        {/* Portal Trigger Buttons */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => openApbdesPortal('pendapatan')}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white text-xs font-bold rounded-xl shadow-sm transition-all"
+            title="Buka portal input & edit anggaran APBDes"
+          >
+            <PieChart className="w-4 h-4" />
+            <span>Kelola APBDes (Portal Anggaran)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsProfileModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all"
+            title="Kelola data desa, pimpinan, dan wilayah Kemendagri"
+          >
+            <Building2 className="w-4 h-4" />
+            <span>Kelola Profil Desa</span>
+          </button>
+        </div>
       </div>
 
       {/* Top 3 Visual Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Total Pendapatan */}
         <div className="bento-card p-5 bg-gradient-to-br from-emerald-50/70 to-teal-50/40 border-emerald-200/80">
-          <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider block mb-1">
-            Total Pendapatan Desa
-          </span>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider block">
+              Total Pendapatan Desa
+            </span>
+            <button
+              onClick={() => openApbdesPortal('pendapatan')}
+              className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 underline"
+            >
+              Ubah Target
+            </button>
+          </div>
           <div className="text-2xl font-extrabold text-emerald-950 font-mono">
-            Rp {(apbdes.pendapatan.total_realized).toLocaleString('id-ID')}
+            Rp {(apbdes.pendapatan?.total_realized || 0).toLocaleString('id-ID')}
           </div>
           <p className="text-xs text-emerald-700 mt-1">
-            Target APBDes: Rp {(apbdes.pendapatan.total_budget).toLocaleString('id-ID')}
+            Target APBDes: Rp {(apbdes.pendapatan?.total_budget || 0).toLocaleString('id-ID')}
           </p>
           <div className="mt-3 w-full bg-emerald-200/60 h-2 rounded-full overflow-hidden">
             <div
-              className="bg-emerald-600 h-full rounded-full"
+              className="bg-emerald-600 h-full rounded-full transition-all duration-500"
               style={{
                 width: `${(apbdes.pendapatan?.total_budget || 0) > 0 ? Math.min(((apbdes.pendapatan.total_realized / apbdes.pendapatan.total_budget) * 100), 100) : 0}%`,
               }}
@@ -82,18 +109,26 @@ export const ApbdesView: React.FC = () => {
 
         {/* Total Belanja */}
         <div className="bento-card p-5 bg-gradient-to-br from-blue-50/70 to-indigo-50/40 border-blue-200/80">
-          <span className="text-xs font-bold text-blue-800 uppercase tracking-wider block mb-1">
-            Total Belanja & Kegiatan
-          </span>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-bold text-blue-800 uppercase tracking-wider block">
+              Total Belanja & Kegiatan
+            </span>
+            <button
+              onClick={() => openApbdesPortal('belanja')}
+              className="text-[11px] font-bold text-blue-700 hover:text-blue-900 underline"
+            >
+              Ubah Plafon
+            </button>
+          </div>
           <div className="text-2xl font-extrabold text-blue-950 font-mono">
-            Rp {(apbdes.belanja.total_realized).toLocaleString('id-ID')}
+            Rp {(apbdes.belanja?.total_realized || 0).toLocaleString('id-ID')}
           </div>
           <p className="text-xs text-blue-700 mt-1">
-            Plafon Anggaran: Rp {(apbdes.belanja.total_budget).toLocaleString('id-ID')}
+            Plafon Anggaran: Rp {(apbdes.belanja?.total_budget || 0).toLocaleString('id-ID')}
           </p>
           <div className="mt-3 w-full bg-blue-200/60 h-2 rounded-full overflow-hidden">
             <div
-              className="bg-blue-600 h-full rounded-full"
+              className="bg-blue-600 h-full rounded-full transition-all duration-500"
               style={{
                 width: `${(apbdes.belanja?.total_budget || 0) > 0 ? Math.min(((apbdes.belanja.total_realized / apbdes.belanja.total_budget) * 100), 100) : 0}%`,
               }}
@@ -103,18 +138,23 @@ export const ApbdesView: React.FC = () => {
 
         {/* Serapan Realisasi */}
         <div className="bento-card p-5 bg-gradient-to-br from-violet-50/70 to-purple-50/40 border-violet-200/80">
-          <span className="text-xs font-bold text-violet-800 uppercase tracking-wider block mb-1">
-            Persentase Serapan Anggaran
-          </span>
-          <div className="text-3xl font-extrabold text-violet-950">
-            {apbdes.realisasi_persen}%
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-bold text-violet-800 uppercase tracking-wider block">
+              Persentase Serapan
+            </span>
+            <span className={`text-[11px] font-bold font-mono ${surplusDefisit >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+              {surplusDefisit >= 0 ? 'Surplus' : 'Defisit'}: Rp {Math.abs(surplusDefisit).toLocaleString('id-ID')}
+            </span>
+          </div>
+          <div className="text-3xl font-extrabold text-violet-950 font-mono">
+            {apbdes.realisasi_persen || 0}%
           </div>
           <p className="text-xs text-violet-700 mt-1">
             Tahun Anggaran {apbdes.fiscal_year} (Realisasi Aktif)
           </p>
           <div className="mt-3 flex items-center gap-1.5 text-xs font-bold text-emerald-700">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            Status Keuangan Desa Sehat
+            <span>Kinerja Anggaran Desa Terkendali</span>
           </div>
         </div>
       </div>
@@ -122,65 +162,83 @@ export const ApbdesView: React.FC = () => {
       {/* Rincian Pos Pendapatan & Belanja */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Table Pendapatan */}
-        <div className="bento-card p-5">
-          <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-emerald-800">
+        <div className="bento-card p-5 space-y-3">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5 text-emerald-800">
               <TrendingUp className="w-4 h-4" />
-              Pos Pendapatan Desa (DDS, ADD, PADes)
-            </span>
-          </h3>
+              <span>Pos Pendapatan Desa (DDS, ADD, PADes)</span>
+            </h3>
+            <button
+              type="button"
+              onClick={() => openApbdesPortal('pendapatan')}
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Kelola Pendapatan</span>
+            </button>
+          </div>
 
           <div className="space-y-3">
-            {apbdes.pendapatan.items.length === 0 ? (
-              <div className="text-center py-8 text-xs text-slate-400">
-                Belum ada rincian pos pendapatan.
+            {(!apbdes.pendapatan?.items || apbdes.pendapatan.items.length === 0) ? (
+              <div className="text-center py-10 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400 space-y-2">
+                <p>Belum ada rincian pos pendapatan untuk TA {apbdes.fiscal_year}.</p>
+                <button
+                  type="button"
+                  onClick={() => openApbdesPortal('pendapatan')}
+                  className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl font-bold text-xs shadow-xs"
+                >
+                  Buka Portal Tambah Pos
+                </button>
               </div>
             ) : (
               apbdes.pendapatan.items.map((item) => (
                 <div
                   key={item.account_code}
-                  className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 text-xs"
+                  className="p-3.5 bg-slate-50/90 hover:bg-white rounded-2xl border border-slate-200/80 transition-all text-xs space-y-2"
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-slate-800">{item.name}</span>
-                    <span className="font-mono text-[11px] text-slate-400">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900">{item.name}</span>
+                    <span className="font-mono text-[11px] font-semibold bg-slate-200/80 px-2 py-0.5 rounded-md text-slate-600">
                       {item.account_code}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between text-slate-500 mb-2">
-                    <span>Anggaran: Rp {item.budget_amount.toLocaleString('id-ID')}</span>
-                    <span className="font-bold text-emerald-700">{item.percentage}%</span>
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span>Target: Rp {(item.budget_amount || 0).toLocaleString('id-ID')}</span>
+                    <span className="font-bold text-emerald-700 font-mono">{item.percentage}%</span>
                   </div>
 
-                  {editingCode === item.account_code ? (
-                    <div className="flex gap-2 items-center mt-2">
-                      <input
-                        type="number"
-                        value={editAmount}
-                        onChange={(e) => setEditAmount(Number(e.target.value))}
-                        className="px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-mono w-full"
-                      />
+                  {/* Progress bar serapan item */}
+                  <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-emerald-600 h-full rounded-full"
+                      style={{ width: `${Math.min(item.percentage || 0, 100)}%` }}
+                    ></div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-slate-700">
+                    <span className="font-bold font-mono text-[11px]">
+                      Realisasi: Rp {(item.realized_amount || 0).toLocaleString('id-ID')}
+                    </span>
+                    <div className="flex items-center gap-2">
                       <button
-                        onClick={() => handleSaveEdit('pendapatan', item.account_code)}
-                        className="p-1.5 bg-emerald-600 text-white rounded-lg"
+                        type="button"
+                        onClick={() => openApbdesPortal('pendapatan')}
+                        className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
                       >
-                        <Save className="w-3.5 h-3.5" />
+                        <Edit3 className="w-3 h-3" />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteApbdesItem('pendapatan', item.account_code)}
+                        className="text-slate-400 hover:text-rose-600 p-0.5"
+                        title="Hapus pos pendapatan ini"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-between text-slate-700 pt-1 border-t border-slate-200/60">
-                      <span className="font-bold font-mono">
-                        Realisasi: Rp {item.realized_amount.toLocaleString('id-ID')}
-                      </span>
-                      <button
-                        onClick={() => handleStartEdit(item.account_code, item.realized_amount)}
-                        className="text-slate-400 hover:text-emerald-700"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
+                  </div>
                 </div>
               ))
             )}
@@ -188,65 +246,83 @@ export const ApbdesView: React.FC = () => {
         </div>
 
         {/* Table Belanja */}
-        <div className="bento-card p-5">
-          <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-blue-800">
+        <div className="bento-card p-5 space-y-3">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5 text-blue-800">
               <DollarSign className="w-4 h-4" />
-              Pos Belanja Bidang Pembangunan & Layanan
-            </span>
-          </h3>
+              <span>Pos Belanja Bidang Pembangunan & Layanan</span>
+            </h3>
+            <button
+              type="button"
+              onClick={() => openApbdesPortal('belanja')}
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Kelola Belanja</span>
+            </button>
+          </div>
 
           <div className="space-y-3">
-            {apbdes.belanja.items.length === 0 ? (
-              <div className="text-center py-8 text-xs text-slate-400">
-                Belum ada rincian pos belanja.
+            {(!apbdes.belanja?.items || apbdes.belanja.items.length === 0) ? (
+              <div className="text-center py-10 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400 space-y-2">
+                <p>Belum ada rincian pos belanja kegiatan untuk TA {apbdes.fiscal_year}.</p>
+                <button
+                  type="button"
+                  onClick={() => openApbdesPortal('belanja')}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded-xl font-bold text-xs shadow-xs"
+                >
+                  Buka Portal Tambah Pos
+                </button>
               </div>
             ) : (
               apbdes.belanja.items.map((item) => (
                 <div
                   key={item.account_code}
-                  className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 text-xs"
+                  className="p-3.5 bg-slate-50/90 hover:bg-white rounded-2xl border border-slate-200/80 transition-all text-xs space-y-2"
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-slate-800">{item.name}</span>
-                    <span className="font-mono text-[11px] text-slate-400">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900">{item.name}</span>
+                    <span className="font-mono text-[11px] font-semibold bg-slate-200/80 px-2 py-0.5 rounded-md text-slate-600">
                       {item.account_code}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between text-slate-500 mb-2">
-                    <span>Plafon: Rp {item.budget_amount.toLocaleString('id-ID')}</span>
-                    <span className="font-bold text-blue-700">{item.percentage}%</span>
+                  <div className="flex items-center justify-between text-slate-600">
+                    <span>Plafon: Rp {(item.budget_amount || 0).toLocaleString('id-ID')}</span>
+                    <span className="font-bold text-blue-700 font-mono">{item.percentage}%</span>
                   </div>
 
-                  {editingCode === item.account_code ? (
-                    <div className="flex gap-2 items-center mt-2">
-                      <input
-                        type="number"
-                        value={editAmount}
-                        onChange={(e) => setEditAmount(Number(e.target.value))}
-                        className="px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-mono w-full"
-                      />
+                  {/* Progress bar serapan item */}
+                  <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-blue-600 h-full rounded-full"
+                      style={{ width: `${Math.min(item.percentage || 0, 100)}%` }}
+                    ></div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-slate-700">
+                    <span className="font-bold font-mono text-[11px]">
+                      Realisasi: Rp {(item.realized_amount || 0).toLocaleString('id-ID')}
+                    </span>
+                    <div className="flex items-center gap-2">
                       <button
-                        onClick={() => handleSaveEdit('belanja', item.account_code)}
-                        className="p-1.5 bg-blue-600 text-white rounded-lg"
+                        type="button"
+                        onClick={() => openApbdesPortal('belanja')}
+                        className="text-xs font-semibold text-blue-700 hover:text-blue-800 flex items-center gap-1"
                       >
-                        <Save className="w-3.5 h-3.5" />
+                        <Edit3 className="w-3 h-3" />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteApbdesItem('belanja', item.account_code)}
+                        className="text-slate-400 hover:text-rose-600 p-0.5"
+                        title="Hapus pos belanja ini"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-between text-slate-700 pt-1 border-t border-slate-200/60">
-                      <span className="font-bold font-mono">
-                        Realisasi: Rp {item.realized_amount.toLocaleString('id-ID')}
-                      </span>
-                      <button
-                        onClick={() => handleStartEdit(item.account_code, item.realized_amount)}
-                        className="text-slate-400 hover:text-blue-700"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
+                  </div>
                 </div>
               ))
             )}
@@ -254,116 +330,116 @@ export const ApbdesView: React.FC = () => {
         </div>
       </div>
 
-      {/* Profil Desa Bento Card */}
-      <div className="bento-card p-6">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-          <div>
-            <h3 className="text-base font-bold text-slate-900">
-              Profil & Struktur Pemerintahan Desa
-            </h3>
-            <p className="text-xs text-slate-500">
-              Informasi kontak resmi kantor desa, pimpinan, dan visi-misi pembangunan
-            </p>
+      {/* Profil Lengkap Desa & Struktur Pemerintahan Bento Card */}
+      <div className="bento-card p-6 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-md shadow-emerald-600/20">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <span>{profile.name || 'Pemerintah Desa'}</span>
+                {profile.code && (
+                  <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                    Kode: {profile.code}
+                  </span>
+                )}
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                {[profile.district, profile.regency, profile.province].filter(Boolean).join(' • ') || 'Identitas wilayah kerja pemerintahan desa'}
+              </p>
+            </div>
           </div>
+
           <button
-            onClick={() => setIsEditingProfile(!isEditingProfile)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all"
+            type="button"
+            onClick={() => setIsProfileModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all shrink-0"
           >
             <Edit3 className="w-3.5 h-3.5" />
-            {isEditingProfile ? 'Batal Edit' : 'Ubah Data Profil'}
+            <span>Kelola Lengkap Profil Desa</span>
           </button>
         </div>
 
-        {isEditingProfile ? (
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Nama Kepala Desa:</label>
-              <input
-                type="text"
-                value={kadesName}
-                onChange={(e) => setKadesName(e.target.value)}
-                className="w-full p-2 bg-slate-50 rounded-xl border border-slate-200"
-              />
+        {/* Baris Identitas Wilayah & Pimpinan Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80">
+            <div className="flex items-center gap-1.5 text-slate-400 font-bold mb-1">
+              <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Kepala Desa / Lurah:</span>
             </div>
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Nama Sekretaris Desa:</label>
-              <input
-                type="text"
-                value={sekdesName}
-                onChange={(e) => setSekdesName(e.target.value)}
-                className="w-full p-2 bg-slate-50 rounded-xl border border-slate-200"
-              />
-            </div>
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Telepon Kantor:</label>
-              <input
-                type="text"
-                value={officePhone}
-                onChange={(e) => setOfficePhone(e.target.value)}
-                className="w-full p-2 bg-slate-50 rounded-xl border border-slate-200"
-              />
-            </div>
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Alamat Balai Desa:</label>
-              <input
-                type="text"
-                value={officeAddress}
-                onChange={(e) => setOfficeAddress(e.target.value)}
-                className="w-full p-2 bg-slate-50 rounded-xl border border-slate-200"
-              />
-            </div>
-            <div className="sm:col-span-2 flex justify-end">
-              <button
-                onClick={handleSaveProfile}
-                className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl"
-              >
-                Simpan Profil
-              </button>
-            </div>
+            <p className="font-bold text-slate-900 text-sm">{profile.kades_name || '-'}</p>
+            <p className="text-[11px] text-emerald-700 font-semibold mt-0.5">Penanggung Jawab Wilayah & Otoritas TTE</p>
           </div>
-        ) : (
-          <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/70">
-              <span className="text-slate-400 font-bold block mb-1">Kepala Desa:</span>
-              <p className="font-bold text-slate-900 text-sm">{profile.kades_name}</p>
-              <p className="text-[11px] text-emerald-700 font-semibold mt-0.5">Penanggung Jawab Wilayah</p>
-            </div>
-            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/70">
-              <span className="text-slate-400 font-bold block mb-1">Sekretaris Desa:</span>
-              <p className="font-bold text-slate-900 text-sm">{profile.sekdes_name}</p>
-              <p className="text-[11px] text-slate-500 mt-0.5">Pimpinan Administrasi</p>
-            </div>
-            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/70">
-              <span className="text-slate-400 font-bold block mb-1">Kontak Kantor:</span>
-              <p className="font-bold text-slate-900">{profile.office_phone}</p>
-              <p className="text-[11px] text-slate-500 mt-0.5">{profile.office_email}</p>
-            </div>
-            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/70">
-              <span className="text-slate-400 font-bold block mb-1">Alamat Balai Desa:</span>
-              <p className="font-bold text-slate-900 line-clamp-2">{profile.office_address}</p>
-            </div>
-          </div>
-        )}
 
-        {/* Visi Misi */}
-        <div className="mt-5 pt-4 border-t border-slate-100 text-xs">
-          <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-200/70 mb-3">
-            <span className="font-bold text-emerald-950 block mb-1">Visi Desa:</span>
+          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80">
+            <div className="flex items-center gap-1.5 text-slate-400 font-bold mb-1">
+              <UserCheck className="w-3.5 h-3.5 text-slate-500" />
+              <span>Sekretaris Desa (Carik):</span>
+            </div>
+            <p className="font-bold text-slate-900 text-sm">{profile.sekdes_name || '-'}</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Pimpinan Tata Usaha & Verifikasi</p>
+          </div>
+
+          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80">
+            <div className="flex items-center gap-1.5 text-slate-400 font-bold mb-1">
+              <Phone className="w-3.5 h-3.5 text-slate-500" />
+              <span>Kontak Kantor:</span>
+            </div>
+            <p className="font-bold text-slate-900">{profile.office_phone || '-'}</p>
+            <p className="text-[11px] text-slate-500 mt-0.5 truncate">{profile.office_email || '-'}</p>
+          </div>
+
+          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80">
+            <div className="flex items-center gap-1.5 text-slate-400 font-bold mb-1">
+              <MapPin className="w-3.5 h-3.5 text-slate-500" />
+              <span>Alamat Kantor Balai Desa:</span>
+            </div>
+            <p className="font-bold text-slate-900 line-clamp-2">{profile.office_address || '-'}</p>
+            {profile.postal_code && (
+              <p className="text-[11px] text-slate-500 mt-0.5">Kode Pos: {profile.postal_code}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Visi Misi Pembangunan */}
+        <div className="pt-4 border-t border-slate-100 text-xs space-y-3">
+          <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-200/70">
+            <span className="font-bold text-emerald-950 block mb-1 flex items-center gap-1.5">
+              <Compass className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Visi Desa:</span>
+            </span>
             <p className="italic text-emerald-900 leading-relaxed">
-              "{profile.vision}"
+              "{profile.vision || 'Mewujudkan tata kelola desa yang transparan, maju, mandiri, dan berkeadilan melalui pelayanan digital terintegrasi.'}"
             </p>
           </div>
 
-          <div>
-            <span className="font-bold text-slate-800 block mb-2">Misi Pembangunan Desa:</span>
-            <ul className="space-y-1.5 list-disc list-inside text-slate-600">
-              {profile.mission.map((m, idx) => (
-                <li key={idx} className="leading-relaxed">{m}</li>
-              ))}
-            </ul>
-          </div>
+          {profile.mission && profile.mission.length > 0 && (
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70">
+              <span className="font-bold text-slate-800 block mb-2">Misi Pembangunan Desa:</span>
+              <ul className="space-y-1.5 list-disc list-inside text-slate-600">
+                {profile.mission.map((m, idx) => (
+                  <li key={idx} className="leading-relaxed">{m}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Modal 1: Portal Kelola APBDes Lengkap */}
+      <ApbdesManageModal
+        isOpen={isApbdesModalOpen}
+        onClose={() => setIsApbdesModalOpen(false)}
+        defaultTab={apbdesModalTab}
+      />
+
+      {/* Modal 2: Portal Kelola Profil & Identitas Desa */}
+      <VillageProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+      />
     </div>
   );
 };

@@ -1,5 +1,6 @@
 // src/components/LetterDetailModal.tsx
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   X, 
   FileText, 
@@ -33,6 +34,7 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter, on
       `470/${Math.floor(10 + Math.random() * 90)}/${letter.letter_name.split('(')[1]?.replace(')', '') || 'SK'}/IX/2026`
   );
   const [rejectReason, setRejectReason] = useState('');
+  const [rejectError, setRejectError] = useState('');
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
@@ -57,20 +59,29 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter, on
 
   const handleReject = () => {
     if (!rejectReason.trim()) {
-      alert('Mohon masukkan alasan penolakan berkas.');
+      setRejectError('Mohon masukkan alasan penolakan berkas untuk pemohon.');
       return;
     }
     updateLetterStatus(letter.id, 'rejected', {
       rejection_reason: rejectReason,
     });
     setShowRejectBox(false);
+    setRejectError('');
   };
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <>
-      <div className="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+      <div 
+        className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 md:p-8 bg-slate-950/70 backdrop-blur-sm animate-fade-in"
+        onClick={onClose}
+      >
         {/* Modal Container: Max-height with safe viewport distance up and down */}
-        <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[calc(100vh-3.5rem)] sm:max-h-[calc(100vh-5rem)] shadow-2xl border border-slate-100 flex flex-col overflow-hidden relative">
+        <div 
+          className="bg-white rounded-3xl max-w-2xl w-full max-h-[calc(100vh-3.5rem)] sm:max-h-[calc(100vh-5rem)] shadow-2xl border border-slate-100 flex flex-col overflow-hidden relative my-auto animate-scale-up"
+          onClick={(e) => e.stopPropagation()}
+        >
           
           {/* Fixed Header Bar */}
           <div className="shrink-0 px-6 sm:px-7 py-4 border-b border-slate-100 flex items-start justify-between bg-white">
@@ -212,21 +223,33 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter, on
               </label>
               <textarea
                 value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
+                onChange={(e) => {
+                  setRejectReason(e.target.value);
+                  if (rejectError) setRejectError('');
+                }}
                 placeholder="Contoh: Lampiran foto KTP buram dan tidak terbaca, mohon unggah ulang..."
                 rows={2}
                 className="w-full p-2.5 text-xs text-slate-800 bg-white rounded-xl border border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-400/20"
               />
+              {rejectError ? (
+                <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-bold text-rose-600">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{rejectError}</span>
+                </div>
+              ) : null}
               <div className="flex justify-end gap-2 mt-2">
                 <button
-                  onClick={() => setShowRejectBox(false)}
+                  onClick={() => {
+                    setShowRejectBox(false);
+                    setRejectError('');
+                  }}
                   className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
                 >
                   Batal
                 </button>
                 <button
                   onClick={handleReject}
-                  className="px-3 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg"
+                  className="px-3 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm shadow-rose-600/20 transition-all"
                 >
                   Konfirmasi Tolak
                 </button>
@@ -337,6 +360,7 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter, on
           onClose={() => setShowQrModal(false)}
         />
       )}
-    </>
+    </>,
+    document.body
   );
 };
