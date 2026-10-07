@@ -53,43 +53,64 @@ export const ApbdesView: React.FC = () => {
         </div>
 
         {/* Portal Trigger Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => openApbdesPortal('pendapatan')}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white text-xs font-bold rounded-xl shadow-sm transition-all"
-            title="Buka portal input & edit anggaran APBDes"
-          >
-            <PieChart className="w-4 h-4" />
-            <span>Kelola APBDes (Portal Anggaran)</span>
-          </button>
+        <div className="flex items-center gap-2.5">
+          {/* Kelola APBDes Button */}
+          <div className="relative group/tooltip inline-block">
+            <button
+              type="button"
+              onClick={() => openApbdesPortal('pendapatan')}
+              aria-label="Kelola APBDes (Portal Anggaran)"
+              className="w-10 h-10 flex items-center justify-center bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl shadow-sm hover:shadow-violet-600/20 hover:scale-105 active:scale-95 transition-all"
+            >
+              <PieChart className="w-4 h-4" />
+            </button>
+            <div className="absolute top-full right-0 sm:left-1/2 sm:-translate-x-1/2 sm:right-auto mt-2 px-2.5 py-1.5 bg-slate-950 text-white text-xs font-semibold rounded-xl shadow-2xl backdrop-blur-md pointer-events-none opacity-0 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0.5 transition-all duration-200 whitespace-nowrap z-50 border border-white/10">
+              Kelola APBDes (Portal Anggaran)
+              <div className="absolute bottom-full right-3 sm:left-1/2 sm:-translate-x-1/2 sm:right-auto -mb-px border-4 border-transparent border-b-slate-950"></div>
+            </div>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setIsProfileModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-all"
-            title="Kelola data desa, pimpinan, dan wilayah Kemendagri"
-          >
-            <Building2 className="w-4 h-4" />
-            <span>Kelola Profil Desa</span>
-          </button>
+          {/* Kelola Profil Desa Button */}
+          <div className="relative group/tooltip inline-block">
+            <button
+              type="button"
+              onClick={() => setIsProfileModalOpen(true)}
+              aria-label="Kelola Profil Desa"
+              className="w-10 h-10 flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm hover:shadow-emerald-600/20 hover:scale-105 active:scale-95 transition-all"
+            >
+              <Building2 className="w-4 h-4" />
+            </button>
+            <div className="absolute top-full right-0 sm:left-1/2 sm:-translate-x-1/2 sm:right-auto mt-2 px-2.5 py-1.5 bg-slate-950 text-white text-xs font-semibold rounded-xl shadow-2xl backdrop-blur-md pointer-events-none opacity-0 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0.5 transition-all duration-200 whitespace-nowrap z-50 border border-white/10">
+              Kelola Profil Desa
+              <div className="absolute bottom-full right-3 sm:left-1/2 sm:-translate-x-1/2 sm:right-auto -mb-px border-4 border-transparent border-b-slate-950"></div>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Top 3 Visual Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Total Pendapatan */}
-        <div className="bento-card p-5 bg-gradient-to-br from-emerald-50/70 to-teal-50/40 border-emerald-200/80">
+        <div className="bento-card p-5 bg-gradient-to-br from-emerald-50/70 to-teal-50/40 border-emerald-200/80 relative overflow-visible">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider block">
               Total Pendapatan Desa
             </span>
-            <button
-              onClick={() => openApbdesPortal('pendapatan')}
-              className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 underline"
-            >
-              Ubah Target
-            </button>
+            {/* Ubah Target Button */}
+            <div className="relative group/tooltip inline-block">
+              <button
+                type="button"
+                onClick={() => openApbdesPortal('pendapatan')}
+                aria-label="Ubah Target Pendapatan"
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-emerald-100/80 hover:bg-emerald-200 text-emerald-800 transition-all shadow-xs hover:scale-105 active:scale-95"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+              </button>
+              <div className="absolute bottom-full right-0 mb-1.5 px-2.5 py-1 bg-slate-950 text-white text-[11px] font-semibold rounded-lg shadow-xl backdrop-blur-md pointer-events-none opacity-0 group-hover/tooltip:opacity-100 group-hover/tooltip:-translate-y-0.5 transition-all duration-150 whitespace-nowrap z-50 border border-white/10">
+                Ubah Target Pendapatan
+                <div className="absolute top-full right-2 -mt-px border-4 border-transparent border-t-slate-950"></div>
+              </div>
+            </div>
           </div>
           <div className="text-2xl font-extrabold text-emerald-950 font-mono">
             Rp {(apbdes.pendapatan?.total_realized || 0).toLocaleString('id-ID')}
@@ -108,17 +129,26 @@ export const ApbdesView: React.FC = () => {
         </div>
 
         {/* Total Belanja */}
-        <div className="bento-card p-5 bg-gradient-to-br from-blue-50/70 to-indigo-50/40 border-blue-200/80">
+        <div className="bento-card p-5 bg-gradient-to-br from-blue-50/70 to-indigo-50/40 border-blue-200/80 relative overflow-visible">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-bold text-blue-800 uppercase tracking-wider block">
               Total Belanja & Kegiatan
             </span>
-            <button
-              onClick={() => openApbdesPortal('belanja')}
-              className="text-[11px] font-bold text-blue-700 hover:text-blue-900 underline"
-            >
-              Ubah Plafon
-            </button>
+            {/* Ubah Plafon Button */}
+            <div className="relative group/tooltip inline-block">
+              <button
+                type="button"
+                onClick={() => openApbdesPortal('belanja')}
+                aria-label="Ubah Plafon Belanja"
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-100/80 hover:bg-blue-200 text-blue-800 transition-all shadow-xs hover:scale-105 active:scale-95"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+              </button>
+              <div className="absolute bottom-full right-0 mb-1.5 px-2.5 py-1 bg-slate-950 text-white text-[11px] font-semibold rounded-lg shadow-xl backdrop-blur-md pointer-events-none opacity-0 group-hover/tooltip:opacity-100 group-hover/tooltip:-translate-y-0.5 transition-all duration-150 whitespace-nowrap z-50 border border-white/10">
+                Ubah Plafon Belanja
+                <div className="absolute top-full right-2 -mt-px border-4 border-transparent border-t-slate-950"></div>
+              </div>
+            </div>
           </div>
           <div className="text-2xl font-extrabold text-blue-950 font-mono">
             Rp {(apbdes.belanja?.total_realized || 0).toLocaleString('id-ID')}
@@ -162,20 +192,27 @@ export const ApbdesView: React.FC = () => {
       {/* Rincian Pos Pendapatan & Belanja */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Table Pendapatan */}
-        <div className="bento-card p-5 space-y-3">
+        <div className="bento-card p-5 space-y-3 relative overflow-visible">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5 text-emerald-800">
               <TrendingUp className="w-4 h-4" />
               <span>Pos Pendapatan Desa (DDS, ADD, PADes)</span>
             </h3>
-            <button
-              type="button"
-              onClick={() => openApbdesPortal('pendapatan')}
-              className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition-all"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Kelola Pendapatan</span>
-            </button>
+            {/* Kelola Pendapatan Button */}
+            <div className="relative group/tooltip inline-block">
+              <button
+                type="button"
+                onClick={() => openApbdesPortal('pendapatan')}
+                aria-label="Kelola Pendapatan"
+                className="w-7 h-7 flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg transition-all shadow-xs hover:scale-105 active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+              <div className="absolute bottom-full right-0 mb-1.5 px-2.5 py-1 bg-slate-950 text-white text-[11px] font-semibold rounded-lg shadow-xl backdrop-blur-md pointer-events-none opacity-0 group-hover/tooltip:opacity-100 group-hover/tooltip:-translate-y-0.5 transition-all duration-150 whitespace-nowrap z-50 border border-white/10">
+                Kelola Pendapatan
+                <div className="absolute top-full right-2 -mt-px border-4 border-transparent border-t-slate-950"></div>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -246,20 +283,27 @@ export const ApbdesView: React.FC = () => {
         </div>
 
         {/* Table Belanja */}
-        <div className="bento-card p-5 space-y-3">
+        <div className="bento-card p-5 space-y-3 relative overflow-visible">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5 text-blue-800">
               <DollarSign className="w-4 h-4" />
               <span>Pos Belanja Bidang Pembangunan & Layanan</span>
             </h3>
-            <button
-              type="button"
-              onClick={() => openApbdesPortal('belanja')}
-              className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold transition-all"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Kelola Belanja</span>
-            </button>
+            {/* Kelola Belanja Button */}
+            <div className="relative group/tooltip inline-block">
+              <button
+                type="button"
+                onClick={() => openApbdesPortal('belanja')}
+                aria-label="Kelola Belanja"
+                className="w-7 h-7 flex items-center justify-center bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg transition-all shadow-xs hover:scale-105 active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+              <div className="absolute bottom-full right-0 mb-1.5 px-2.5 py-1 bg-slate-950 text-white text-[11px] font-semibold rounded-lg shadow-xl backdrop-blur-md pointer-events-none opacity-0 group-hover/tooltip:opacity-100 group-hover/tooltip:-translate-y-0.5 transition-all duration-150 whitespace-nowrap z-50 border border-white/10">
+                Kelola Belanja
+                <div className="absolute top-full right-2 -mt-px border-4 border-transparent border-t-slate-950"></div>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -352,14 +396,20 @@ export const ApbdesView: React.FC = () => {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setIsProfileModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all shrink-0"
-          >
-            <Edit3 className="w-3.5 h-3.5" />
-            <span>Kelola Lengkap Profil Desa</span>
-          </button>
+          <div className="relative group/tooltip inline-block shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsProfileModalOpen(true)}
+              aria-label="Kelola Profil Desa"
+              className="w-10 h-10 flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm hover:scale-105 active:scale-95 transition-all"
+            >
+              <Edit3 className="w-4 h-4" />
+            </button>
+            <div className="absolute top-full right-0 mt-2 px-2.5 py-1.5 bg-slate-950 text-white text-xs font-semibold rounded-xl shadow-2xl backdrop-blur-md pointer-events-none opacity-0 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0.5 transition-all duration-200 whitespace-nowrap z-50 border border-white/10">
+              Kelola Profil Desa
+              <div className="absolute bottom-full right-3 -mb-px border-4 border-transparent border-b-slate-950"></div>
+            </div>
+          </div>
         </div>
 
         {/* Baris Identitas Wilayah & Pimpinan Grid */}

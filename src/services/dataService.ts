@@ -69,23 +69,28 @@ class DataService {
       return this.cache[key];
     }
     try {
-      const data = localStorage.getItem(key);
-      const parsed = data ? JSON.parse(data) : fallback;
-      this.cache[key] = parsed;
-      return parsed;
+      if (typeof localStorage !== 'undefined') {
+        const data = localStorage.getItem(key);
+        const parsed = data ? JSON.parse(data) : fallback;
+        this.cache[key] = parsed;
+        return parsed;
+      }
     } catch {
-      this.cache[key] = fallback;
-      return fallback;
+      // fallback
     }
+    this.cache[key] = fallback;
+    return fallback;
   }
 
   private setStorage<T>(key: string, value: T): void {
     try {
       this.cache[key] = value;
-      localStorage.setItem(key, JSON.stringify(value));
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(key, JSON.stringify(value));
+      }
       this.notify();
     } catch (e) {
-      console.error('Failed to save to localStorage', e);
+      console.error('Failed to save to storage', e);
     }
   }
 
@@ -98,7 +103,7 @@ class DataService {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!citErr && citData && citData.length > 0) {
+      if (!citErr && Array.isArray(citData)) {
         this.setStorage(STORAGE_KEYS.CITIZENS, citData);
         this.isSupabaseConnected = true;
       }
@@ -109,7 +114,7 @@ class DataService {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!letErr && letData && letData.length > 0) {
+      if (!letErr && Array.isArray(letData)) {
         this.setStorage(STORAGE_KEYS.LETTERS, letData);
         this.isSupabaseConnected = true;
       }
@@ -120,7 +125,7 @@ class DataService {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!cmpErr && cmpData && cmpData.length > 0) {
+      if (!cmpErr && Array.isArray(cmpData)) {
         this.setStorage(STORAGE_KEYS.COMPLAINTS, cmpData);
         this.isSupabaseConnected = true;
       }
@@ -131,20 +136,25 @@ class DataService {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!ancErr && ancData && ancData.length > 0) {
+      if (!ancErr && Array.isArray(ancData)) {
         this.setStorage(STORAGE_KEYS.ANNOUNCEMENTS, ancData);
         this.isSupabaseConnected = true;
       }
 
       // 5. Check village profile
-      const { data: profData, error: profErr } = await supabase
-        .from('village_profiles')
-        .select('*')
-        .limit(1)
-        .single();
+      const currentOfficial = this.getCurrentOfficial();
+      let profQuery = supabase.from('village_profiles').select('*');
+      if (currentOfficial?.village_code) {
+        profQuery = profQuery.eq('code', currentOfficial.village_code);
+      }
+      const { data: profData, error: profErr } = await profQuery.limit(1).maybeSingle();
 
-      if (!profErr && profData) {
-        this.setStorage(STORAGE_KEYS.PROFILE, profData);
+      if (!profErr) {
+        if (profData) {
+          this.setStorage(STORAGE_KEYS.PROFILE, profData);
+        } else {
+          this.setStorage(STORAGE_KEYS.PROFILE, initialVillageProfile);
+        }
         this.isSupabaseConnected = true;
       }
 
@@ -154,7 +164,7 @@ class DataService {
         .select('*')
         .order('order_index', { ascending: true });
 
-      if (!emgErr && emgData && emgData.length > 0) {
+      if (!emgErr && Array.isArray(emgData)) {
         this.setStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, emgData);
         this.isSupabaseConnected = true;
       }
@@ -165,7 +175,7 @@ class DataService {
         .select('*')
         .order('event_date', { ascending: true });
 
-      if (!evtErr && evtData && evtData.length > 0) {
+      if (!evtErr && Array.isArray(evtData)) {
         this.setStorage(STORAGE_KEYS.VILLAGE_EVENTS, evtData);
         this.isSupabaseConnected = true;
       }
@@ -175,45 +185,49 @@ class DataService {
         .from('apbdes_items')
         .select('*');
 
-      if (!apbErr && apbData && apbData.length > 0) {
-        const fiscalYear = apbData[0].fiscal_year || new Date().getFullYear();
-        const pendapatanItems = apbData.filter((i: any) => i.type === 'pendapatan');
-        const belanjaItems = apbData.filter((i: any) => i.type === 'belanja');
+      if (!apbErr && Array.isArray(apbData)) {
+        if (apbData.length > 0) {
+          const fiscalYear = apbData[0].fiscal_year || new Date().getFullYear();
+          const pendapatanItems = apbData.filter((i: any) => i.type === 'pendapatan');
+          const belanjaItems = apbData.filter((i: any) => i.type === 'belanja');
 
-        const pBudget = pendapatanItems.reduce((s: number, i: any) => s + (Number(i.budget_amount) || 0), 0);
-        const pRealized = pendapatanItems.reduce((s: number, i: any) => s + (Number(i.realized_amount) || 0), 0);
-        const bBudget = belanjaItems.reduce((s: number, i: any) => s + (Number(i.budget_amount) || 0), 0);
-        const bRealized = belanjaItems.reduce((s: number, i: any) => s + (Number(i.realized_amount) || 0), 0);
-        const totalB = pBudget + bBudget;
-        const totalR = pRealized + bRealized;
+          const pBudget = pendapatanItems.reduce((s: number, i: any) => s + (Number(i.budget_amount) || 0), 0);
+          const pRealized = pendapatanItems.reduce((s: number, i: any) => s + (Number(i.realized_amount) || 0), 0);
+          const bBudget = belanjaItems.reduce((s: number, i: any) => s + (Number(i.budget_amount) || 0), 0);
+          const bRealized = belanjaItems.reduce((s: number, i: any) => s + (Number(i.realized_amount) || 0), 0);
+          const totalB = pBudget + bBudget;
+          const totalR = pRealized + bRealized;
 
-        const fullApb: ApbdesData = {
-          fiscal_year: fiscalYear,
-          pendapatan: {
-            total_budget: pBudget,
-            total_realized: pRealized,
-            items: pendapatanItems.map((i: any) => ({
-              account_code: i.account_code,
-              name: i.name,
-              budget_amount: Number(i.budget_amount) || 0,
-              realized_amount: Number(i.realized_amount) || 0,
-              percentage: Number(i.percentage) || 0
-            }))
-          },
-          belanja: {
-            total_budget: bBudget,
-            total_realized: bRealized,
-            items: belanjaItems.map((i: any) => ({
-              account_code: i.account_code,
-              name: i.name,
-              budget_amount: Number(i.budget_amount) || 0,
-              realized_amount: Number(i.realized_amount) || 0,
-              percentage: Number(i.percentage) || 0
-            }))
-          },
-          realisasi_persen: totalB > 0 ? Number(((totalR / totalB) * 100).toFixed(1)) : 0
-        };
-        this.setStorage(STORAGE_KEYS.APBDES, fullApb);
+          const fullApb: ApbdesData = {
+            fiscal_year: fiscalYear,
+            pendapatan: {
+              total_budget: pBudget,
+              total_realized: pRealized,
+              items: pendapatanItems.map((i: any) => ({
+                account_code: i.account_code,
+                name: i.name,
+                budget_amount: Number(i.budget_amount) || 0,
+                realized_amount: Number(i.realized_amount) || 0,
+                percentage: Number(i.percentage) || 0
+              }))
+            },
+            belanja: {
+              total_budget: bBudget,
+              total_realized: bRealized,
+              items: belanjaItems.map((i: any) => ({
+                account_code: i.account_code,
+                name: i.name,
+                budget_amount: Number(i.budget_amount) || 0,
+                realized_amount: Number(i.realized_amount) || 0,
+                percentage: Number(i.percentage) || 0
+              }))
+            },
+            realisasi_persen: totalB > 0 ? Number(((totalR / totalB) * 100).toFixed(1)) : 0
+          };
+          this.setStorage(STORAGE_KEYS.APBDES, fullApb);
+        } else {
+          this.setStorage(STORAGE_KEYS.APBDES, initialApbdes);
+        }
         this.isSupabaseConnected = true;
       }
 
@@ -245,6 +259,12 @@ class DataService {
                 currentLetters[idx] = { ...currentLetters[idx], ...updated };
                 this.setStorage(STORAGE_KEYS.LETTERS, [...currentLetters]);
               }
+            } else if (payload.eventType === 'DELETE') {
+              const old = payload.old as { id?: string; tracking_number?: string };
+              this.setStorage(
+                STORAGE_KEYS.LETTERS,
+                currentLetters.filter((l) => (!old.id || l.id !== old.id) && (!old.tracking_number || l.tracking_number !== old.tracking_number))
+              );
             }
           }
         )
@@ -264,6 +284,14 @@ class DataService {
               if (idx !== -1) {
                 currentComplaints[idx] = updated;
                 this.setStorage(STORAGE_KEYS.COMPLAINTS, [...currentComplaints]);
+              }
+            } else if (payload.eventType === 'DELETE') {
+              const old = payload.old as { id?: string };
+              if (old && old.id) {
+                this.setStorage(
+                  STORAGE_KEYS.COMPLAINTS,
+                  currentComplaints.filter((c) => c.id !== old.id)
+                );
               }
             }
           }
@@ -285,6 +313,12 @@ class DataService {
                 currentCitizens[idx] = updated;
                 this.setStorage(STORAGE_KEYS.CITIZENS, [...currentCitizens]);
               }
+            } else if (payload.eventType === 'DELETE') {
+              const old = payload.old as { id?: string; nik?: string };
+              this.setStorage(
+                STORAGE_KEYS.CITIZENS,
+                currentCitizens.filter((c) => (!old?.id || c.id !== old.id) && (!old?.nik || c.nik !== old.nik))
+              );
             }
           }
         )
@@ -304,6 +338,14 @@ class DataService {
               if (idx !== -1) {
                 currentAnnouncements[idx] = updated;
                 this.setStorage(STORAGE_KEYS.ANNOUNCEMENTS, [...currentAnnouncements]);
+              }
+            } else if (payload.eventType === 'DELETE') {
+              const old = payload.old as { id?: string };
+              if (old && old.id) {
+                this.setStorage(
+                  STORAGE_KEYS.ANNOUNCEMENTS,
+                  currentAnnouncements.filter((a) => a.id !== old.id)
+                );
               }
             }
           }
@@ -384,11 +426,20 @@ class DataService {
 
   // Active Role (Pamong Desa / Kades)
   getActiveRole(): 'admin_desa' | 'kades' {
-    return (localStorage.getItem(STORAGE_KEYS.ACTIVE_ROLE) as 'admin_desa' | 'kades') || 'admin_desa';
+    if (this.cache[STORAGE_KEYS.ACTIVE_ROLE]) {
+      return this.cache[STORAGE_KEYS.ACTIVE_ROLE];
+    }
+    if (typeof localStorage !== 'undefined') {
+      return (localStorage.getItem(STORAGE_KEYS.ACTIVE_ROLE) as 'admin_desa' | 'kades') || 'admin_desa';
+    }
+    return 'admin_desa';
   }
 
   setActiveRole(role: 'admin_desa' | 'kades') {
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_ROLE, role);
+    this.cache[STORAGE_KEYS.ACTIVE_ROLE] = role;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_ROLE, role);
+    }
     this.notify();
   }
 
@@ -474,8 +525,13 @@ class DataService {
     // Auto generate QR token when approved or signed
     if (status === 'signed' || status === 'completed') {
       if (!letter.qr_verification_token) {
-        letter.qr_verification_token = `valid-${Math.random().toString(36).substring(2, 8)}-${letter.letter_name.toLowerCase().replace(/[^a-z0-9]/g, '')}-2026`;
-        letter.qr_verification_url = `https://dekati.desa.id/verify/${letter.qr_verification_token}`;
+        const secureCode = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID().split('-')[0] + '-' + crypto.randomUUID().split('-')[1]
+          : `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`;
+        const cleanLetterSlug = (letter.letter_name || 'surat').toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 12);
+        const origin = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : 'https://dekati.desa.id';
+        letter.qr_verification_token = `valid-${secureCode}-${cleanLetterSlug}-${new Date().getFullYear()}`;
+        letter.qr_verification_url = `${origin}/#/verify/${letter.qr_verification_token}`;
       }
       letter.signed_by_name = extra?.signed_by_name || this.getVillageProfile().kades_name || 'Kepala Desa';
       letter.signed_at = new Date().toLocaleString('id-ID');
@@ -579,6 +635,40 @@ class DataService {
     }
 
     return letter;
+  }
+
+  async getLetterByTokenOrTracking(tokenOrTracking: string): Promise<LetterRequest | null> {
+    const q = tokenOrTracking.trim();
+    if (!q) return null;
+
+    // Check local storage first
+    const letters = this.getLetters();
+    const localMatch = letters.find(
+      (l) =>
+        (l.qr_verification_token && l.qr_verification_token.toLowerCase() === q.toLowerCase()) ||
+        l.tracking_number.toLowerCase() === q.toLowerCase() ||
+        (l.letter_official_number && l.letter_official_number.toLowerCase() === q.toLowerCase()) ||
+        l.id === q
+    );
+    if (localMatch) return localMatch;
+
+    // Direct Supabase lookup
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q);
+      let query = supabase.from('letter_requests').select('*');
+      if (isUuid) {
+        query = query.or(`id.eq.${q},tracking_number.eq.${q},qr_verification_token.eq.${q}`);
+      } else {
+        query = query.or(`tracking_number.eq.${q},qr_verification_token.eq.${q}`);
+      }
+      const { data, error } = await query.maybeSingle();
+      if (!error && data) {
+        return data as LetterRequest;
+      }
+    } catch (e) {
+      console.warn('Supabase getLetterByTokenOrTracking error', e);
+    }
+    return null;
   }
 
   // Complaints
@@ -777,7 +867,7 @@ class DataService {
 
     // Sync to Supabase apbdes_items
     try {
-      await supabase.from('apbdes_items').delete().neq('id', 0); // clear all
+      await supabase.from('apbdes_items').delete().eq('fiscal_year', updatedApbdes.fiscal_year);
 
       const rowsToInsert = [
         ...pendapatanItems.map((i) => ({
@@ -1074,15 +1164,22 @@ class DataService {
     const cleanEmail = email.trim().toLowerCase();
 
     try {
-      // 1. Coba panggil fungsi RPC authenticate_official di Supabase
       const { data, error } = await supabase.rpc('authenticate_official', {
         p_email: cleanEmail,
         p_password: password
       });
 
-      if (!error && data && data.length > 0) {
+      if (error) {
+        console.error('[Dekati Auth] Server authentication failed:', error);
+        return { success: false, error: 'Layanan autentikasi tidak tersedia. Silakan coba lagi.' };
+      }
+
+      if (Array.isArray(data) && data.length > 0) {
         const user = data[0] as VillageOfficial;
-        this.setStorage(STORAGE_KEYS.CURRENT_OFFICIAL, user);
+        if (!user.id || !user.email || user.status !== 'active') {
+          return { success: false, error: 'Kredensial tidak valid.' };
+        }
+        this.cache[STORAGE_KEYS.CURRENT_OFFICIAL] = user;
         this.setActiveRole(user.role === 'kades' || user.role === 'lurah' ? 'kades' : 'admin_desa');
 
         if (user.village_code) {
@@ -1110,36 +1207,12 @@ class DataService {
         }
         return { success: true, user };
       }
-
-      if (!error && (!data || data.length === 0)) {
-        return { success: false, error: 'Email dinas atau kata sandi tidak cocok.' };
-      }
     } catch (e) {
-      console.warn('[Dekati Auth] Supabase RPC offline, menggunakan fallback demo lokal.', e);
+      console.error('[Dekati Auth] Supabase RPC unavailable:', e);
+      return { success: false, error: 'Layanan autentikasi tidak tersedia. Silakan coba lagi.' };
     }
 
-    // 2. Fallback jika offline: periksa akun aparat terdaftar di penyimpanan lokal
-    const localOfficials = this.getStorage<VillageOfficial[]>(STORAGE_KEYS.OFFICIALS_LIST, []);
-    const matched = localOfficials.find(
-      (o) => o.email.toLowerCase() === cleanEmail || o.nik === cleanEmail
-    );
-    if (matched) {
-      this.setStorage(STORAGE_KEYS.CURRENT_OFFICIAL, matched);
-      this.setActiveRole(matched.role === 'kades' || matched.role === 'lurah' ? 'kades' : 'admin_desa');
-      if (matched.village_name && matched.village_name !== 'Pemerintah Desa') {
-        this.updateVillageProfile({
-          name: matched.village_name,
-          code: matched.village_code || '',
-          ...(matched.role === 'kades' || matched.role === 'lurah' ? { kades_name: matched.nama_lengkap } : {})
-        });
-      }
-      return { success: true, user: matched };
-    }
-
-    return {
-      success: false,
-      error: 'Akun perangkat desa belum terdaftar. Silakan lakukan registrasi terlebih dahulu.'
-    };
+    return { success: false, error: 'Email dinas atau kata sandi tidak cocok.' };
   }
 
   async registerOfficial(payload: {
@@ -1155,94 +1228,14 @@ class DataService {
     province?: string;
     phone?: string;
   }): Promise<{ success: boolean; user?: VillageOfficial; error?: string }> {
-    const cleanEmail = payload.email.trim().toLowerCase();
-
-    try {
-      // 1. Coba panggil fungsi RPC register_official di Supabase
-      const { data, error } = await supabase.rpc('register_official', {
-        p_nama: payload.nama,
-        p_email: cleanEmail,
-        p_password: payload.password,
-        p_role: payload.role,
-        p_nik: payload.nik,
-        p_village_code: payload.village_code || '',
-        p_village_name: payload.village_name || 'Pemerintah Desa',
-        p_phone: payload.phone || null
-      });
-
-      if (!error && data && data.length > 0) {
-        const newUser: VillageOfficial = {
-          id: data[0].id,
-          nik: payload.nik,
-          nama_lengkap: data[0].nama_lengkap,
-          email: data[0].email,
-          role: data[0].role as any,
-          can_sign_tte: payload.role === 'kades' || payload.role === 'lurah',
-          village_name: data[0].village_name,
-          village_code: payload.village_code || '',
-          status: 'active'
-        };
-
-        const localOfficials = this.getStorage<VillageOfficial[]>(STORAGE_KEYS.OFFICIALS_LIST, []);
-        if (!localOfficials.some((o) => o.email.toLowerCase() === newUser.email.toLowerCase())) {
-          localOfficials.push(newUser);
-          this.setStorage(STORAGE_KEYS.OFFICIALS_LIST, localOfficials);
-        }
-
-        if (payload.village_name || payload.district) {
-          this.updateVillageProfile({
-            name: payload.village_name || 'Pemerintah Desa',
-            code: payload.village_code || '',
-            district: payload.district || '',
-            regency: payload.regency || '',
-            province: payload.province || '',
-            ...(payload.role === 'kades' || payload.role === 'lurah' ? { kades_name: payload.nama } : {})
-          });
-        }
-
-        return { success: true, user: newUser };
-      }
-
-      if (error) {
-        console.warn('[Dekati Register RPC Error]:', error);
-      }
-    } catch (e) {
-      console.warn('[Dekati Register] Offline fallback', e);
-    }
-
-    // 2. Fallback Response (Local / Offline mode)
-    const fallbackUser: VillageOfficial = {
-      id: `off-${Date.now()}`,
-      nik: payload.nik,
-      nama_lengkap: payload.nama,
-      email: cleanEmail,
-      role: payload.role as any,
-      can_sign_tte: payload.role === 'kades' || payload.role === 'lurah',
-      village_name: payload.village_name || 'Pemerintah Desa',
-      village_code: payload.village_code || '',
-      status: 'active'
+    return {
+      success: false,
+      error: 'Pendaftaran mandiri dinonaktifkan. Hubungi administrator desa untuk membuat akun.'
     };
-
-    const localOfficials = this.getStorage<VillageOfficial[]>(STORAGE_KEYS.OFFICIALS_LIST, []);
-    localOfficials.push(fallbackUser);
-    this.setStorage(STORAGE_KEYS.OFFICIALS_LIST, localOfficials);
-
-    if (payload.village_name || payload.district) {
-      this.updateVillageProfile({
-        name: payload.village_name || 'Pemerintah Desa',
-        code: payload.village_code || '',
-        district: payload.district || '',
-        regency: payload.regency || '',
-        province: payload.province || '',
-        ...(payload.role === 'kades' || payload.role === 'lurah' ? { kades_name: payload.nama } : {})
-      });
-    }
-
-    return { success: true, user: fallbackUser };
   }
 
   getCurrentOfficial(): VillageOfficial | null {
-    return this.getStorage<VillageOfficial | null>(STORAGE_KEYS.CURRENT_OFFICIAL, null);
+    return this.cache[STORAGE_KEYS.CURRENT_OFFICIAL] || null;
   }
 
   logoutOfficial() {
@@ -1263,6 +1256,7 @@ class DataService {
     localStorage.removeItem(STORAGE_KEYS.CURRENT_OFFICIAL);
     localStorage.removeItem(STORAGE_KEYS.EMERGENCY_CONTACTS);
     localStorage.removeItem(STORAGE_KEYS.VILLAGE_EVENTS);
+    localStorage.removeItem(STORAGE_KEYS.OFFICIALS_LIST);
     this.syncFromSupabase();
     this.notify();
   }

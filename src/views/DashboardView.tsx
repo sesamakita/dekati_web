@@ -51,8 +51,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
   return (
     <div className="space-y-6 pb-12 animate-fade-in">
       {/* Welcome Banner Bento Card */}
-      <div className="bento-card p-6 sm:p-7 bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white relative overflow-hidden">
-        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-white/5 skew-x-12 pointer-events-none"></div>
+      <div className="bento-card p-6 sm:p-7 bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white relative overflow-visible">
+        {/* Background Decorative Skew Shape (Safely clipped inside its own container) */}
+        <div className="absolute inset-0 overflow-hidden rounded-2xl sm:rounded-3xl pointer-events-none">
+          <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-white/5 skew-x-12"></div>
+        </div>
+
         <div className="relative z-10 max-w-2xl">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/10 backdrop-blur-md text-emerald-200 mb-3 border border-white/15">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -65,21 +69,43 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             Kelola permohonan surat warga, tanggapi laporan aduan fasilitas desa, dan pantau transparansi APBDes {profile.name} secara real-time.
           </p>
 
-          <div className="mt-5 flex flex-wrap gap-2.5">
-            <button
-              onClick={() => setShowAnnouncementModal(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold rounded-xl shadow-md transition-all"
-            >
-              <Radio className="w-4 h-4" />
-              Kirim Siaran Pengumuman
-            </button>
-            <button
-              onClick={() => onNavigateTab('letters')}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl border border-white/20 backdrop-blur-sm transition-all"
-            >
-              <FileText className="w-4 h-4" />
-              Tinjau {pendingLetters.length} Permohonan Surat
-            </button>
+          <div className="mt-5 flex items-center gap-3">
+            {/* Action 1: Kirim Siaran Pengumuman */}
+            <div className="relative group/tooltip inline-block">
+              <button
+                onClick={() => setShowAnnouncementModal(true)}
+                aria-label="Kirim Siaran Pengumuman"
+                className="w-11 h-11 flex items-center justify-center bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-2xl shadow-lg hover:shadow-emerald-500/25 hover:scale-105 active:scale-95 transition-all"
+              >
+                <Radio className="w-5 h-5" />
+              </button>
+              {/* Tooltip */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 px-3 py-1.5 bg-slate-950 text-white text-xs font-semibold rounded-xl shadow-2xl backdrop-blur-md pointer-events-none opacity-0 group-hover/tooltip:opacity-100 group-hover/tooltip:-translate-y-1 transition-all duration-200 whitespace-nowrap z-50 border border-white/10">
+                Kirim Siaran Pengumuman
+                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-950"></div>
+              </div>
+            </div>
+
+            {/* Action 2: Tinjau Permohonan Surat */}
+            <div className="relative group/tooltip inline-block">
+              <button
+                onClick={() => onNavigateTab('letters')}
+                aria-label="Tinjau Permohonan Surat"
+                className="w-11 h-11 flex items-center justify-center bg-white/15 hover:bg-white/25 text-white rounded-2xl border border-white/20 backdrop-blur-md shadow-lg hover:scale-105 active:scale-95 transition-all relative"
+              >
+                <FileText className="w-5 h-5" />
+                {pendingLetters.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-400 text-slate-950 font-black text-[10px] rounded-full flex items-center justify-center shadow-md border-2 border-emerald-900">
+                    {pendingLetters.length}
+                  </span>
+                )}
+              </button>
+              {/* Tooltip */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 px-3 py-1.5 bg-slate-950 text-white text-xs font-semibold rounded-xl shadow-2xl backdrop-blur-md pointer-events-none opacity-0 group-hover/tooltip:opacity-100 group-hover/tooltip:-translate-y-1 transition-all duration-200 whitespace-nowrap z-50 border border-white/10">
+                Tinjau {pendingLetters.length > 0 ? `${pendingLetters.length} ` : ''}Permohonan Surat
+                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-950"></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

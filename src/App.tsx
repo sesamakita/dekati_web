@@ -1,170 +1,202 @@
 // src/App.tsx
-import React, { useState, useEffect } from 'react';
-import { Header } from './components/Header';
-import { Sidebar, NavTab } from './components/Sidebar';
-import { DashboardView } from './views/DashboardView';
-import { LettersView } from './views/LettersView';
-import { ComplaintsView } from './views/ComplaintsView';
-import { CitizensView } from './views/CitizensView';
-import { AnnouncementsView } from './views/AnnouncementsView';
-import { ApbdesView } from './views/ApbdesView';
-import { EventsView } from './views/EventsView';
+import React, { useState, Suspense, lazy } from 'react';
+import {
+  HashRouter,
+  Routes,
+  Route,
+  Navigate,
+  useNavigate
+} from 'react-router-dom';
+import { AdminLayout } from './layouts/AdminLayout';
 import { LandingPageView } from './views/LandingPageView';
-import { AuthView } from './views/AuthView';
 import { dataService } from './services/dataService';
 
-export const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('dekati_auth_v1') === 'true';
-  });
+// Lazy-loaded views for optimal code-splitting
+const DashboardView = lazy(() => import('./views/DashboardView').then(m => ({ default: m.DashboardView })));
+const LettersView = lazy(() => import('./views/LettersView').then(m => ({ default: m.LettersView })));
+const ComplaintsView = lazy(() => import('./views/ComplaintsView').then(m => ({ default: m.ComplaintsView })));
+const CitizensView = lazy(() => import('./views/CitizensView').then(m => ({ default: m.CitizensView })));
+const AnnouncementsView = lazy(() => import('./views/AnnouncementsView').then(m => ({ default: m.AnnouncementsView })));
+const ApbdesView = lazy(() => import('./views/ApbdesView').then(m => ({ default: m.ApbdesView })));
+const EventsView = lazy(() => import('./views/EventsView').then(m => ({ default: m.EventsView })));
+const AuthView = lazy(() => import('./views/AuthView').then(m => ({ default: m.AuthView })));
+const PublicVerifyView = lazy(() => import('./views/PublicVerifyView'));
 
-  const [portalMode, setPortalMode] = useState<'landing' | 'auth' | 'admin'>(() => {
-    const hash = window.location.hash;
-    if (hash === '#admin') {
-      return localStorage.getItem('dekati_auth_v1') === 'true' ? 'admin' : 'auth';
-    }
-    if (hash === '#login' || hash === '#register') {
-      return 'auth';
-    }
-    return 'landing';
-  });
+// Loading Fallback Component
+const ViewLoader: React.FC = () => (
+  <div className="flex-1 flex items-center justify-center p-12 min-h-[350px]">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <span className="text-xs text-slate-500 font-medium">Memuat halaman...</span>
+    </div>
+  </div>
+);
 
-  const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
-
-  useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash;
-      const authed = localStorage.getItem('dekati_auth_v1') === 'true';
-      if (hash === '#admin') {
-        if (authed) {
-          setPortalMode('admin');
-        } else {
-          setPortalMode('auth');
-          window.location.hash = '#login';
-        }
-      } else if (hash === '#login' || hash === '#register') {
-        setPortalMode('auth');
-      } else if (hash === '#landing' || !hash) {
-        setPortalMode('landing');
-      }
-    };
-
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
-
+// Wrapper for Landing Page
+const LandingPageWrapper: React.FC<{ isAuthenticated: boolean }> = ({ isAuthenticated }) => {
+  const navigate = useNavigate();
   const handleEnterAdmin = () => {
     if (isAuthenticated) {
-      setPortalMode('admin');
-      window.location.hash = '#admin';
+      navigate('/admin/dashboard');
     } else {
-      setPortalMode('auth');
-      window.location.hash = '#login';
+      navigate('/login');
     }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+  return <LandingPageView onEnterAdmin={handleEnterAdmin} />;
+};
 
-  const handleEnterLanding = () => {
-    setPortalMode('landing');
-    window.location.hash = '#landing';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+// Wrapper for Auth Page
+const AuthPageWrapper: React.FC<{
+  onLoginSuccess: (role: 'admin_desa' | 'kades', userEmail?: string) => void;
+}> = ({ onLoginSuccess }) => {
+  const navigate = useNavigate();
+  return (
+    <Suspense fallback={<ViewLoader />}>
+      <AuthView
+        onLoginSuccess={(role, email) => {
+          onLoginSuccess(role, email);
+          navigate('/admin/dashboard');
+        }}
+        onBackToLanding={() => navigate('/')}
+      />
+    </Suspense>
+  );
+};
+
+// Wrapper for Dashboard View with Navigation handler
+const DashboardWrapper: React.FC = () => {
+  const navigate = useNavigate();
+  return (
+    <DashboardView
+      onNavigateTab={(tab) => {
+        navigate(`/admin/${tab}`);
+        document.getElementById('main-content')?.scrollTo({ top: 0, behavior: 'smooth' });
+      }}
+    />
+  );
+};
+
+export const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const handleLoginSuccess = (role: 'admin_desa' | 'kades', userEmail?: string) => {
     setIsAuthenticated(true);
-    localStorage.setItem('dekati_auth_v1', 'true');
-    if (userEmail) {
-      localStorage.setItem('dekati_auth_user_v1', userEmail);
-    }
+    void userEmail;
     dataService.setActiveRole(role);
-    setPortalMode('admin');
-    window.location.hash = '#admin';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    localStorage.removeItem('dekati_auth_v1');
-    localStorage.removeItem('dekati_auth_user_v1');
-    setPortalMode('landing');
-    window.location.hash = '#landing';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    dataService.logoutOfficial();
   };
 
-  const handleNavigate = (tab: NavTab) => {
-    setActiveTab(tab);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const renderActiveView = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return <DashboardView onNavigateTab={handleNavigate} />;
-      case 'letters':
-        return <LettersView />;
-      case 'complaints':
-        return <ComplaintsView />;
-      case 'citizens':
-        return <CitizensView />;
-      case 'announcements':
-        return <AnnouncementsView />;
-      case 'events':
-        return <EventsView />;
-      case 'apbdes':
-        return <ApbdesView />;
-      default:
-        return <DashboardView onNavigateTab={handleNavigate} />;
-    }
-  };
-
-  // 1. If in Public Landing Page Mode
-  if (portalMode === 'landing') {
-    return <LandingPageView onEnterAdmin={handleEnterAdmin} />;
-  }
-
-  // 2. If in Login / Register Auth Mode
-  if (portalMode === 'auth') {
-    return (
-      <AuthView
-        onLoginSuccess={handleLoginSuccess}
-        onBackToLanding={handleEnterLanding}
-        initialMode={window.location.hash === '#register' ? 'register' : 'login'}
-      />
-    );
-  }
-
-  // 3. If in Admin Dashboard Mode
   return (
-    <div className="h-screen w-screen bg-[#F8FAFC] text-slate-800 flex flex-col overflow-hidden animate-fade-in">
-      {/* Fixed / Static Header with Logout & Landing Link */}
-      <Header
-        onOpenLanding={handleEnterLanding}
-        onLogout={handleLogout}
-      />
-
-      {/* Main Layout Container (fills remaining viewport height) */}
-      <div className="flex-1 flex overflow-hidden w-full">
-        {/* Static / Diam Pinned Sidebar */}
-        <Sidebar
-          activeTab={activeTab}
-          onOpenLanding={handleEnterLanding}
-          onSelectTab={(tab) => {
-            setActiveTab(tab);
-            document.getElementById('main-content')?.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
+    <HashRouter>
+      <Routes>
+        {/* Public Landing Page */}
+        <Route
+          path="/"
+          element={<LandingPageWrapper isAuthenticated={isAuthenticated} />}
         />
 
-        {/* Independently Scrollable Content Area */}
-        <main
-          id="main-content"
-          className="flex-1 h-full overflow-y-auto px-6 sm:px-8 py-7 min-w-0 scroll-smooth"
+        {/* Public QR Code Letter Verification */}
+        <Route
+          path="/verify/:token"
+          element={
+            <Suspense fallback={<ViewLoader />}>
+              <PublicVerifyView />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/verify"
+          element={
+            <Suspense fallback={<ViewLoader />}>
+              <PublicVerifyView />
+            </Suspense>
+          }
+        />
+
+        {/* Auth / Login Page */}
+        <Route
+          path="/login"
+          element={<AuthPageWrapper onLoginSuccess={handleLoginSuccess} />}
+        />
+
+        {/* Protected Admin Portal with Nested Routes */}
+        <Route
+          path="/admin"
+          element={
+            <AdminLayout
+              isAuthenticated={isAuthenticated}
+              onLogout={handleLogout}
+            />
+          }
         >
-          <div className="max-w-7xl mx-auto">
-            {renderActiveView()}
-          </div>
-        </main>
-      </div>
-    </div>
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route
+            path="dashboard"
+            element={
+              <Suspense fallback={<ViewLoader />}>
+                <DashboardWrapper />
+              </Suspense>
+            }
+          />
+          <Route
+            path="letters"
+            element={
+              <Suspense fallback={<ViewLoader />}>
+                <LettersView />
+              </Suspense>
+            }
+          />
+          <Route
+            path="complaints"
+            element={
+              <Suspense fallback={<ViewLoader />}>
+                <ComplaintsView />
+              </Suspense>
+            }
+          />
+          <Route
+            path="citizens"
+            element={
+              <Suspense fallback={<ViewLoader />}>
+                <CitizensView />
+              </Suspense>
+            }
+          />
+          <Route
+            path="announcements"
+            element={
+              <Suspense fallback={<ViewLoader />}>
+                <AnnouncementsView />
+              </Suspense>
+            }
+          />
+          <Route
+            path="events"
+            element={
+              <Suspense fallback={<ViewLoader />}>
+                <EventsView />
+              </Suspense>
+            }
+          />
+          <Route
+            path="apbdes"
+            element={
+              <Suspense fallback={<ViewLoader />}>
+                <ApbdesView />
+              </Suspense>
+            }
+          />
+          <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+        </Route>
+
+        {/* Fallback wildcard route */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </HashRouter>
   );
 };
 
