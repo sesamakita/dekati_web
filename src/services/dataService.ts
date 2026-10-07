@@ -1228,10 +1228,90 @@ class DataService {
     province?: string;
     phone?: string;
   }): Promise<{ success: boolean; user?: VillageOfficial; error?: string }> {
-    return {
-      success: false,
-      error: 'Pendaftaran mandiri dinonaktifkan. Hubungi administrator desa untuk membuat akun.'
+    const cleanEmail = payload.email.trim().toLowerCase();
+
+    try {
+      // 1. Coba panggil fungsi RPC register_official di Supabase
+      const { data, error } = await supabase.rpc('register_official', {
+        p_nama: payload.nama,
+        p_email: cleanEmail,
+        p_password: payload.password,
+        p_role: payload.role,
+        p_nik: payload.nik,
+        p_village_code: payload.village_code || '',
+        p_village_name: payload.village_name || 'Pemerintah Desa',
+        p_phone: payload.phone || null
+      });
+
+      if (!error && data && data.length > 0) {
+        const newUser: VillageOfficial = {
+          id: data[0].id,
+          nik: payload.nik,
+          nama_lengkap: data[0].nama_lengkap,
+          email: data[0].email,
+          role: data[0].role as any,
+          can_sign_tte: payload.role === 'kades' || payload.role === 'lurah',
+          village_name: data[0].village_name,
+          village_code: payload.village_code || '',
+          status: 'active'
+        };
+
+        const localOfficials = this.getStorage<VillageOfficial[]>(STORAGE_KEYS.OFFICIALS_LIST, []);
+        if (!localOfficials.some((o) => o.email.toLowerCase() === newUser.email.toLowerCase())) {
+          localOfficials.push(newUser);
+          this.setStorage(STORAGE_KEYS.OFFICIALS_LIST, localOfficials);
+        }
+
+        if (payload.village_name || payload.district) {
+          this.updateVillageProfile({
+            name: payload.village_name || 'Pemerintah Desa',
+            code: payload.village_code || '',
+            district: payload.district || '',
+            regency: payload.regency || '',
+            province: payload.province || '',
+            ...(payload.role === 'kades' || payload.role === 'lurah' ? { kades_name: payload.nama } : {})
+          });
+        }
+
+        return { success: true, user: newUser };
+      }
+
+      if (error) {
+        console.warn('[Dekati Register RPC Error]:', error);
+      }
+    } catch (e) {
+      console.warn('[Dekati Register] Offline fallback', e);
+    }
+
+    // 2. Fallback Response (Local / Offline mode)
+    const fallbackUser: VillageOfficial = {
+      id: `off-${Date.now()}`,
+      nik: payload.nik,
+      nama_lengkap: payload.nama,
+      email: cleanEmail,
+      role: payload.role as any,
+      can_sign_tte: payload.role === 'kades' || payload.role === 'lurah',
+      village_name: payload.village_name || 'Pemerintah Desa',
+      village_code: payload.village_code || '',
+      status: 'active'
     };
+
+    const localOfficials = this.getStorage<VillageOfficial[]>(STORAGE_KEYS.OFFICIALS_LIST, []);
+    localOfficials.push(fallbackUser);
+    this.setStorage(STORAGE_KEYS.OFFICIALS_LIST, localOfficials);
+
+    if (payload.village_name || payload.district) {
+      this.updateVillageProfile({
+        name: payload.village_name || 'Pemerintah Desa',
+        code: payload.village_code || '',
+        district: payload.district || '',
+        regency: payload.regency || '',
+        province: payload.province || '',
+        ...(payload.role === 'kades' || payload.role === 'lurah' ? { kades_name: payload.nama } : {})
+      });
+    }
+
+    return { success: true, user: fallbackUser };
   }
 
   getCurrentOfficial(): VillageOfficial | null {
