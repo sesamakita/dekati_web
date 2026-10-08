@@ -744,14 +744,30 @@ class DataService {
 
     // Sync to Supabase
     try {
-      await supabase
+      const updatePayload: any = {
+        is_verified: citizen.is_verified,
+        verified_at: approve ? new Date().toISOString() : null,
+        verified_by: citizen.verified_by,
+        updated_at: new Date().toISOString()
+      };
+
+      const res = await supabase
         .from('citizens')
-        .update({
-          is_verified: citizen.is_verified,
-          verified_at: approve ? new Date().toISOString() : null,
-          verified_by: citizen.verified_by
-        })
+        .update(updatePayload)
         .eq('id', id);
+
+      if (res.error) {
+        console.warn('[Dekati DataService] Failed updating citizen by ID, trying by NIK:', res.error);
+        if (citizen.nik) {
+          const resNik = await supabase
+            .from('citizens')
+            .update(updatePayload)
+            .eq('nik', citizen.nik);
+          if (resNik.error) {
+            console.error('[Dekati DataService] Failed updating citizen by NIK:', resNik.error);
+          }
+        }
+      }
     } catch (e) {
       console.warn('Supabase citizen verification offline', e);
     }

@@ -176,6 +176,11 @@ export const CitizensView: React.FC = () => {
                     <div className="text-[11px] text-slate-500">
                       {citizen.jenis_kelamin === 'L' ? 'Laki-laki' : citizen.jenis_kelamin === 'P' ? 'Perempuan' : '-'} • {[citizen.tempat_lahir, citizen.tanggal_lahir].filter(Boolean).join(', ') || '-'}
                     </div>
+                    {citizen.phone_number && (
+                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                        Telp: {citizen.phone_number}
+                      </div>
+                    )}
                   </td>
                   <td className="py-4 px-4 font-semibold text-slate-700">
                     {citizen.status_dalam_keluarga || '-'}
@@ -183,7 +188,8 @@ export const CitizensView: React.FC = () => {
                   <td className="py-4 px-4 text-slate-600">
                     <div className="font-semibold text-slate-800">{citizen.dusun || '-'}</div>
                     <div className="text-[11px] text-slate-500">
-                      {(citizen.rt || citizen.rw) ? `RT ${citizen.rt || '-'} / RW ${citizen.rw || '-'}` : '-'}
+                      {(citizen.rt || citizen.rw) ? `RT ${citizen.rt || '-'}/RW ${citizen.rw || '-'}` : '-'}
+                      {citizen.village_name ? ` • ${citizen.village_name}` : ''}
                     </div>
                   </td>
                   <td className="py-4 px-4 text-slate-600">
@@ -194,6 +200,11 @@ export const CitizensView: React.FC = () => {
                       <span className="badge-pill bg-emerald-50 text-emerald-700 border border-emerald-200">
                         <CheckCircle className="w-3 h-3 text-emerald-600" />
                         Terverifikasi
+                      </span>
+                    ) : citizen.verified_by?.startsWith('revisi:') ? (
+                      <span className="badge-pill bg-rose-50 text-rose-700 border border-rose-200">
+                        <ShieldAlert className="w-3 h-3 text-rose-600" />
+                        Perlu Revisi
                       </span>
                     ) : (
                       <span className="badge-pill bg-amber-50 text-amber-700 border border-amber-200">

@@ -52,17 +52,17 @@ export interface Citizen {
   nik: string;
   no_kk: string;
   nama_lengkap: string;
-  tempat_lahir: string;
-  tanggal_lahir: string;
-  jenis_kelamin: GenderType;
-  agama: string;
-  pekerjaan: string;
-  status_perkawinan: string;
-  status_dalam_keluarga: string;
-  alamat_lengkap: string;
-  rt: string;
-  rw: string;
-  dusun: string;
+  tempat_lahir?: string;
+  tanggal_lahir?: string;
+  jenis_kelamin?: GenderType;
+  agama?: string;
+  pekerjaan?: string;
+  status_perkawinan?: string;
+  status_dalam_keluarga?: string;
+  alamat_lengkap?: string;
+  rt?: string;
+  rw?: string;
+  dusun?: string;
   phone_number?: string;
   email?: string;
   foto_ktp_path?: string;
@@ -71,6 +71,13 @@ export interface Citizen {
   is_verified: boolean;
   verified_at?: string;
   verified_by?: string;
+  village_name?: string;
+  village_code?: string;
+  district?: string;
+  regency?: string;
+  province?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface LetterType {
