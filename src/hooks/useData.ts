@@ -43,6 +43,7 @@ export function useData() {
     updateVillageEvent: dataService.updateVillageEvent.bind(dataService),
     deleteVillageEvent: dataService.deleteVillageEvent.bind(dataService),
     updateVillageProfile: dataService.updateVillageProfile.bind(dataService),
+    syncFromSupabase: () => dataService.syncFromSupabase(),
     resetAllData: dataService.resetAllData.bind(dataService),
   };
 }
