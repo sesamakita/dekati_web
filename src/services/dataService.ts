@@ -84,7 +84,9 @@ class DataService {
 
   private setStorage<T>(key: string, value: T): void {
     try {
-      this.cache[key] = value;
+      this.cache[key] = Array.isArray(value) 
+        ? [...value] 
+        : (typeof value === 'object' && value !== null ? { ...value } : value);
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(key, JSON.stringify(value));
       }
@@ -303,21 +305,38 @@ class DataService {
             const currentCitizens = this.getCitizens();
             if (payload.eventType === 'INSERT') {
               const newCit = payload.new as Citizen;
-              if (!currentCitizens.find((c) => c.id === newCit.id)) {
+              const exists = currentCitizens.some(
+                (c) => c.id === newCit.id || (c.nik && newCit.nik && c.nik === newCit.nik)
+              );
+              if (!exists) {
                 this.setStorage(STORAGE_KEYS.CITIZENS, [newCit, ...currentCitizens]);
+              } else {
+                const updatedList = currentCitizens.map((c) =>
+                  (c.id === newCit.id || (c.nik && newCit.nik && c.nik === newCit.nik))
+                    ? { ...c, ...newCit }
+                    : c
+                );
+                this.setStorage(STORAGE_KEYS.CITIZENS, updatedList);
               }
             } else if (payload.eventType === 'UPDATE') {
               const updated = payload.new as Citizen;
-              const idx = currentCitizens.findIndex((c) => c.id === updated.id);
+              const idx = currentCitizens.findIndex(
+                (c) => c.id === updated.id || (c.nik && updated.nik && c.nik === updated.nik)
+              );
               if (idx !== -1) {
-                currentCitizens[idx] = updated;
-                this.setStorage(STORAGE_KEYS.CITIZENS, [...currentCitizens]);
+                const newList = [...currentCitizens];
+                newList[idx] = { ...newList[idx], ...updated };
+                this.setStorage(STORAGE_KEYS.CITIZENS, newList);
+              } else {
+                this.setStorage(STORAGE_KEYS.CITIZENS, [updated, ...currentCitizens]);
               }
             } else if (payload.eventType === 'DELETE') {
               const old = payload.old as { id?: string; nik?: string };
               this.setStorage(
                 STORAGE_KEYS.CITIZENS,
-                currentCitizens.filter((c) => (!old?.id || c.id !== old.id) && (!old?.nik || c.nik !== old.nik))
+                currentCitizens.filter(
+                  (c) => (!old?.id || c.id !== old.id) && (!old?.nik || c.nik !== old.nik)
+                )
               );
             }
           }
@@ -720,12 +739,13 @@ class DataService {
 
   // Citizens
   getCitizens(): Citizen[] {
-    return this.getStorage(STORAGE_KEYS.CITIZENS, initialCitizens);
+    const list = this.getStorage(STORAGE_KEYS.CITIZENS, initialCitizens);
+    return Array.isArray(list) ? [...list] : [];
   }
 
   async verifyCitizen(id: string, approve: boolean, notes?: string): Promise<Citizen | undefined> {
     const citizens = this.getCitizens();
-    const index = citizens.findIndex((c) => c.id === id);
+    const index = citizens.findIndex((c) => c.id === id || (c.nik && c.nik === id));
     if (index === -1) return undefined;
 
     const citizen = { ...citizens[index] };
@@ -739,8 +759,9 @@ class DataService {
       citizen.verified_at = new Date().toLocaleString('id-ID');
     }
 
-    citizens[index] = citizen;
-    this.setStorage(STORAGE_KEYS.CITIZENS, citizens);
+    const updatedCitizens = [...citizens];
+    updatedCitizens[index] = citizen;
+    this.setStorage(STORAGE_KEYS.CITIZENS, updatedCitizens);
 
     // Sync to Supabase
     try {
@@ -754,7 +775,7 @@ class DataService {
       const res = await supabase
         .from('citizens')
         .update(updatePayload)
-        .eq('id', id);
+        .eq('id', citizen.id);
 
       if (res.error) {
         console.warn('[Dekati DataService] Failed updating citizen by ID, trying by NIK:', res.error);
@@ -773,6 +794,55 @@ class DataService {
     }
 
     return citizen;
+  }
+
+  async verifyFamilyGroup(noKk: string, approve: boolean, notes?: string): Promise<number> {
+    const cleanNoKk = (noKk || '').trim();
+    if (!cleanNoKk) return 0;
+
+    const citizens = this.getCitizens();
+    let count = 0;
+    const nowIso = new Date().toISOString();
+    const nowLocal = new Date().toLocaleString('id-ID');
+    const verifiedBy = approve ? 'Operator Verifikasi Desa' : `revisi: ${notes || 'Dokumen KK buram atau belum sesuai'}`;
+
+    const updatedCitizens = citizens.map((c) => {
+      if (c.no_kk && c.no_kk.trim() === cleanNoKk) {
+        count++;
+        return {
+          ...c,
+          is_verified: approve,
+          verified_at: nowLocal,
+          verified_by: verifiedBy
+        };
+      }
+      return c;
+    });
+
+    this.setStorage(STORAGE_KEYS.CITIZENS, updatedCitizens);
+
+    // Sync to Supabase in one batch query
+    try {
+      const updatePayload: any = {
+        is_verified: approve,
+        verified_at: approve ? nowIso : null,
+        verified_by: verifiedBy,
+        updated_at: nowIso
+      };
+
+      const res = await supabase
+        .from('citizens')
+        .update(updatePayload)
+        .eq('no_kk', cleanNoKk);
+
+      if (res.error) {
+        console.warn('[Dekati DataService] Failed batch update family by no_kk:', res.error);
+      }
+    } catch (e) {
+      console.warn('Supabase family batch verification offline', e);
+    }
+
+    return count;
   }
 
   // Announcements

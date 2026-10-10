@@ -32,7 +32,7 @@ interface CitizenVerifyModalProps {
 }
 
 export const CitizenVerifyModal: React.FC<CitizenVerifyModalProps> = ({ citizen, onClose }) => {
-  const { verifyCitizen, citizens } = useData();
+  const { verifyCitizen, verifyFamilyGroup, citizens } = useData();
   const [activeCitizen, setActiveCitizen] = useState<Citizen>(citizen);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectError, setRejectError] = useState('');
@@ -44,10 +44,21 @@ export const CitizenVerifyModal: React.FC<CitizenVerifyModalProps> = ({ citizen,
     setActiveCitizen(citizen);
   }, [citizen]);
 
+  // Keep activeCitizen synchronized with latest data in citizens list
+  useEffect(() => {
+    const fresh = citizens.find((c) => c.id === activeCitizen.id || (c.nik && c.nik === activeCitizen.nik));
+    if (fresh) {
+      setActiveCitizen(fresh);
+    }
+  }, [citizens, activeCitizen.id, activeCitizen.nik]);
+
   // Find all members in the same Kartu Keluarga (KK)
   const familyMembers = citizens.filter(
     (c) => c.no_kk && activeCitizen.no_kk && c.no_kk.trim() === activeCitizen.no_kk.trim()
   );
+
+  const unverifiedFamilyMembers = familyMembers.filter((m) => !m.is_verified);
+  const hasMultipleUnverifiedFamily = unverifiedFamilyMembers.length > 0;
 
   const isHeadOfFamily = (activeCitizen.status_dalam_keluarga || '').toLowerCase().includes('kepala keluarga') ||
     activeCitizen.status_dalam_keluarga === 'Kepala Keluarga';
@@ -70,8 +81,18 @@ export const CitizenVerifyModal: React.FC<CitizenVerifyModalProps> = ({ citizen,
     setIsSubmitting(true);
     try {
       await verifyCitizen(activeCitizen.id, true);
-      // Update local state if needed
       setActiveCitizen(prev => ({ ...prev, is_verified: true, verified_by: 'Operator Verifikasi Desa' }));
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleApproveAllFamily = async () => {
+    if (!activeCitizen.no_kk) return;
+    setIsSubmitting(true);
+    try {
+      await verifyFamilyGroup(activeCitizen.no_kk, true);
       onClose();
     } finally {
       setIsSubmitting(false);
@@ -178,14 +199,26 @@ export const CitizenVerifyModal: React.FC<CitizenVerifyModalProps> = ({ citizen,
           {/* Kartu Keluarga Digital: Daftar Seluruh Anggota Keluarga */}
           {familyMembers.length > 1 && (
             <div className="p-3.5 bg-indigo-50/60 rounded-2xl border border-indigo-100">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-indigo-600" />
-                  Daftar Anggota Keluarga ({familyMembers.length} Jiwa dalam KK ini)
-                </span>
-                <span className="text-[11px] font-mono font-semibold text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded">
-                  No. KK: {activeCitizen.no_kk}
-                </span>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <div>
+                  <span className="text-xs font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-indigo-600" />
+                    Daftar Anggota Keluarga ({familyMembers.length} Jiwa dalam KK ini)
+                  </span>
+                  <span className="text-[11px] font-mono text-indigo-700 block mt-0.5">
+                    No. KK: {activeCitizen.no_kk}
+                  </span>
+                </div>
+                {hasMultipleUnverifiedFamily && (
+                  <button
+                    onClick={handleApproveAllFamily}
+                    disabled={isSubmitting}
+                    className="px-2.5 py-1 text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-all disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <CheckCircle className="w-3 h-3" />
+                    Verifikasi Sekaligus 1 KK ({familyMembers.length} Jiwa)
+                  </button>
+                )}
               </div>
               <div className="divide-y divide-indigo-100/70 text-xs">
                 {familyMembers.map((member) => {
@@ -207,19 +240,28 @@ export const CitizenVerifyModal: React.FC<CitizenVerifyModalProps> = ({ citizen,
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         {member.is_verified ? (
                           <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded">
                             Terverifikasi
                           </span>
                         ) : (
-                          <span className="text-[10px] font-bold text-amber-700 bg-amber-100/70 px-1.5 py-0.5 rounded">
-                            Perlu Validasi
-                          </span>
+                          <button
+                            onClick={async () => {
+                              await verifyCitizen(member.id, true);
+                            }}
+                            disabled={isSubmitting}
+                            className="px-2 py-0.5 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md transition-colors"
+                          >
+                            Setujui
+                          </button>
                         )}
                         {!isCurrent && (
-                          <button className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center">
-                            Periksa <ChevronRight className="w-3 h-3" />
+                          <button 
+                            onClick={() => setActiveCitizen(member)}
+                            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center ml-1"
+                          >
+                            Berkas <ChevronRight className="w-3 h-3" />
                           </button>
                         )}
                       </div>
@@ -550,7 +592,7 @@ export const CitizenVerifyModal: React.FC<CitizenVerifyModalProps> = ({ citizen,
             <div />
           )}
 
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex flex-wrap items-center gap-2 ml-auto">
             <button
               onClick={onClose}
               disabled={isSubmitting}
@@ -558,6 +600,18 @@ export const CitizenVerifyModal: React.FC<CitizenVerifyModalProps> = ({ citizen,
             >
               Tutup
             </button>
+
+            {hasMultipleUnverifiedFamily && (
+              <button
+                onClick={handleApproveAllFamily}
+                disabled={isSubmitting}
+                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl shadow-sm transition-all disabled:opacity-50"
+              >
+                <Users className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Setujui 1 KK ({familyMembers.length} Jiwa)</span>
+              </button>
+            )}
+
             <button
               onClick={handleApprove}
               disabled={isSubmitting}
@@ -571,7 +625,7 @@ export const CitizenVerifyModal: React.FC<CitizenVerifyModalProps> = ({ citizen,
               ) : (
                 <>
                   <CheckCircle className="w-4 h-4" />
-                  <span>Setujui & Verifikasi Warga</span>
+                  <span>{familyMembers.length > 1 ? 'Setujui Warga Ini' : 'Setujui & Verifikasi'}</span>
                 </>
               )}
             </button>

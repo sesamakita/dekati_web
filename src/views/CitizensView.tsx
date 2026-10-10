@@ -40,6 +40,15 @@ export const CitizensView: React.FC = () => {
     }
   };
 
+  // Auto-sync when entering this page and periodic background polling
+  React.useEffect(() => {
+    syncFromSupabase();
+    const timer = setInterval(() => {
+      syncFromSupabase();
+    }, 15000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Group citizens by Kartu Keluarga (KK)
   const kkGroups = useMemo(() => {
     const map = new Map<string, Citizen[]>();
