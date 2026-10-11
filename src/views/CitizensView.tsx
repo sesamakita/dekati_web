@@ -299,9 +299,12 @@ export const CitizensView: React.FC = () => {
                           {(() => {
                             const docInfo = resolveCitizenDocInfo(citizen);
                             return docInfo.hasDoc ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                              <span 
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200"
+                                title={docInfo.label !== 'Dokumen Fisik' ? `Jenis Berkas: ${docInfo.label}` : undefined}
+                              >
                                 <FileText className="w-3 h-3 text-emerald-600" />
-                                {docInfo.label}
+                                Dokumen Fisik
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200">
