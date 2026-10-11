@@ -20,6 +20,7 @@ import {
 import { useData } from '../hooks/useData';
 import { CitizenVerifyModal } from '../components/CitizenVerifyModal';
 import { Citizen } from '../types';
+import { resolveCitizenDocInfo } from '../services/docUtils';
 
 export const CitizensView: React.FC = () => {
   const { citizens, syncFromSupabase } = useData();
@@ -295,16 +296,19 @@ export const CitizensView: React.FC = () => {
                           </div>
                         </td>
                         <td className="py-4 px-4">
-                          {hasDoc ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
-                              <FileText className="w-3 h-3 text-emerald-600" />
-                              {citizen.foto_ktp_path ? 'e-KTP' : citizen.foto_kk_path ? 'Akta/KK' : 'Ada Berkas'}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200">
-                              Belum Ada
-                            </span>
-                          )}
+                          {(() => {
+                            const docInfo = resolveCitizenDocInfo(citizen);
+                            return docInfo.hasDoc ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                                <FileText className="w-3 h-3 text-emerald-600" />
+                                {docInfo.label}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200">
+                                Belum Ada
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="py-4 px-4">
                           {citizen.is_verified ? (
