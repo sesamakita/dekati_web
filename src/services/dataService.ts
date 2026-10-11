@@ -139,7 +139,9 @@ class DataService {
         .order('created_at', { ascending: false });
 
       if (!ancErr && Array.isArray(ancData)) {
-        this.setStorage(STORAGE_KEYS.ANNOUNCEMENTS, ancData);
+        if (ancData.length > 0 || this.getAnnouncements().length === 0) {
+          this.setStorage(STORAGE_KEYS.ANNOUNCEMENTS, ancData.length > 0 ? ancData : initialAnnouncements);
+        }
         this.isSupabaseConnected = true;
       }
 
@@ -167,7 +169,9 @@ class DataService {
         .order('order_index', { ascending: true });
 
       if (!emgErr && Array.isArray(emgData)) {
-        this.setStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, emgData);
+        if (emgData.length > 0 || this.getEmergencyContacts().length === 0) {
+          this.setStorage(STORAGE_KEYS.EMERGENCY_CONTACTS, emgData.length > 0 ? emgData : initialEmergencyContacts);
+        }
         this.isSupabaseConnected = true;
       }
 
@@ -178,7 +182,9 @@ class DataService {
         .order('event_date', { ascending: true });
 
       if (!evtErr && Array.isArray(evtData)) {
-        this.setStorage(STORAGE_KEYS.VILLAGE_EVENTS, evtData);
+        if (evtData.length > 0 || this.getVillageEvents().length === 0) {
+          this.setStorage(STORAGE_KEYS.VILLAGE_EVENTS, evtData.length > 0 ? evtData : initialVillageEvents);
+        }
         this.isSupabaseConnected = true;
       }
 
@@ -895,6 +901,25 @@ class DataService {
     }
 
     return newAnnouncement;
+  }
+
+  async deleteAnnouncement(id: string): Promise<boolean> {
+    const list = this.getAnnouncements();
+    const filtered = list.filter((a) => a.id !== id);
+    this.setStorage(STORAGE_KEYS.ANNOUNCEMENTS, filtered);
+
+    // Sync to Supabase
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      if (isUuid) {
+        await supabase.from('announcements').delete().eq('id', id);
+      }
+    } catch (e) {
+      console.warn('Supabase announcement delete offline', e);
+    }
+
+    this.notify();
+    return true;
   }
 
   // APBDes

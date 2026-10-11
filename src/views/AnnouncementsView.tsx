@@ -10,16 +10,23 @@ import {
   Send, 
   CheckCircle2,
   Users,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { NewAnnouncementModal } from '../components/NewAnnouncementModal';
+import { CustomDialog } from '../components/CustomDialog';
 import { Announcement } from '../types';
 
 export const AnnouncementsView: React.FC = () => {
-  const { announcements } = useData();
+  const { announcements, deleteAnnouncement } = useData();
   const [showModal, setShowModal] = useState(false);
   const [activeAnnouncement, setActiveAnnouncement] = useState<Announcement | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; id: string; title: string }>({
+    isOpen: false,
+    id: '',
+    title: ''
+  });
 
   const getCategoryBadge = (cat: string) => {
     switch (cat) {
@@ -70,16 +77,30 @@ export const AnnouncementsView: React.FC = () => {
             <div>
               {/* Category & Urgency badges */}
               <div className="flex items-center justify-between gap-2 mb-3">
-                <span className={`badge-pill border ${getCategoryBadge(item.category)}`}>
-                  {item.category}
-                </span>
-
-                {item.is_urgent && (
-                  <span className="badge-pill bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1 animate-pulse">
-                    <AlertTriangle className="w-3 h-3 text-rose-600" />
-                    Mendesak
+                <div className="flex items-center gap-1.5">
+                  <span className={`badge-pill border ${getCategoryBadge(item.category)}`}>
+                    {item.category}
                   </span>
-                )}
+
+                  {item.is_urgent && (
+                    <span className="badge-pill bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1 animate-pulse">
+                      <AlertTriangle className="w-3 h-3 text-rose-600" />
+                      Mendesak
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteDialog({ isOpen: true, id: item.id, title: item.title });
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
+                  title="Hapus Pengumuman"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
 
               {/* Title & Summary */}
@@ -146,7 +167,19 @@ export const AnnouncementsView: React.FC = () => {
               </p>
             </div>
 
-            <div className="shrink-0 px-6 py-3.5 border-t border-slate-100 bg-slate-50/80 flex justify-end">
+            <div className="shrink-0 px-6 py-3.5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between">
+              <button
+                onClick={() => {
+                  const id = activeAnnouncement.id;
+                  const title = activeAnnouncement.title;
+                  setActiveAnnouncement(null);
+                  setDeleteDialog({ isOpen: true, id, title });
+                }}
+                className="px-3.5 py-2 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors border border-rose-200"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Hapus
+              </button>
               <button
                 onClick={() => setActiveAnnouncement(null)}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm shadow-emerald-600/20"
@@ -162,6 +195,22 @@ export const AnnouncementsView: React.FC = () => {
       {showModal && (
         <NewAnnouncementModal onClose={() => setShowModal(false)} />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <CustomDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, id: '', title: '' })}
+        title="Hapus Pengumuman"
+        message={`Apakah Anda yakin ingin menghapus pengumuman "${deleteDialog.title}"? Tindakan ini akan menghapus siaran dari aplikasi seluruh warga.`}
+        type="danger"
+        confirmText="Ya, Hapus"
+        cancelText="Batal"
+        showCancel={true}
+        onConfirm={async () => {
+          await deleteAnnouncement(deleteDialog.id);
+          setDeleteDialog({ isOpen: false, id: '', title: '' });
+        }}
+      />
     </div>
   );
 };

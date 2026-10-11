@@ -32,6 +32,7 @@ export function useData() {
     verifyCitizen: dataService.verifyCitizen.bind(dataService),
     verifyFamilyGroup: dataService.verifyFamilyGroup.bind(dataService),
     createAnnouncement: dataService.createAnnouncement.bind(dataService),
+    deleteAnnouncement: dataService.deleteAnnouncement.bind(dataService),
     updateApbdesItem: dataService.updateApbdesItem.bind(dataService),
     saveFullApbdes: dataService.saveFullApbdes.bind(dataService),
     addApbdesItem: dataService.addApbdesItem.bind(dataService),
