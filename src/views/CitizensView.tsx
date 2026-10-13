@@ -15,18 +15,28 @@ import {
   Home,
   FileText,
   User,
-  CreditCard
+  CreditCard,
+  Briefcase,
+  FileSpreadsheet,
+  X
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { CitizenVerifyModal } from '../components/CitizenVerifyModal';
 import { Citizen } from '../types';
 import { resolveCitizenDocInfo } from '../services/docUtils';
+import {
+  normalizeOccupation,
+  aggregateOccupations,
+  generateOccupationReportCsv,
+  OCCUPATION_CATEGORIES,
+} from '../services/occupationUtils';
 
 export const CitizensView: React.FC = () => {
-  const { citizens, syncFromSupabase } = useData();
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'kk'>('all');
+  const { citizens, profile, syncFromSupabase } = useData();
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'kk' | 'profesi'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDusun, setSelectedDusun] = useState<string>('all');
+  const [selectedOccupation, setSelectedOccupation] = useState<string>('all');
   const [selectedCitizen, setSelectedCitizen] = useState<Citizen | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -70,16 +80,22 @@ export const CitizensView: React.FC = () => {
     });
   }, [citizens]);
 
+  const occupationSummary = useMemo(() => aggregateOccupations(citizens), [citizens]);
+
   const filteredCitizens = citizens.filter((c) => {
     const matchesTab = activeTab === 'all' ? true : activeTab === 'pending' ? !c.is_verified : true;
     const matchesSearch =
       (c.nama_lengkap || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (c.nik || '').includes(searchQuery) ||
       (c.no_kk || '').includes(searchQuery) ||
+      (c.pekerjaan || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (c.phone_number || '').includes(searchQuery);
     const matchesDusun = selectedDusun === 'all' ? true : c.dusun === selectedDusun;
+    const matchesOccupation = selectedOccupation === 'all'
+      ? true
+      : normalizeOccupation(c.pekerjaan) === selectedOccupation;
 
-    return matchesTab && matchesSearch && matchesDusun;
+    return matchesTab && matchesSearch && matchesDusun && matchesOccupation;
   });
 
   const filteredKkGroups = kkGroups.filter((group) => {
@@ -92,11 +108,11 @@ export const CitizensView: React.FC = () => {
   });
 
   const handleExportCsv = () => {
-    const headers = 'ID,NIK,No_KK,Nama_Lengkap,Jenis_Kelamin,Status_Keluarga,Dusun,RT,RW,No_Telepon,Terverifikasi\n';
+    const headers = 'ID,NIK,No_KK,Nama_Lengkap,Jenis_Kelamin,Status_Keluarga,Pekerjaan,Kategori_Profesi,Dusun,RT,RW,No_Telepon,Terverifikasi\n';
     const rows = citizens
       .map(
         (c) =>
-          `"${c.id}","${c.nik || ''}","${c.no_kk || ''}","${c.nama_lengkap || ''}","${c.jenis_kelamin || ''}","${c.status_dalam_keluarga || ''}","${c.dusun || ''}","${c.rt || ''}","${c.rw || ''}","${c.phone_number || ''}","${c.is_verified ? 'Ya' : 'Belum'}"`
+          `"${c.id}","${c.nik || ''}","${c.no_kk || ''}","${c.nama_lengkap || ''}","${c.jenis_kelamin || ''}","${c.status_dalam_keluarga || ''}","${c.pekerjaan || ''}","${normalizeOccupation(c.pekerjaan)}","${c.dusun || ''}","${c.rt || ''}","${c.rw || ''}","${c.phone_number || ''}","${c.is_verified ? 'Ya' : 'Belum'}"`
       )
       .join('\n');
 
@@ -105,6 +121,18 @@ export const CitizensView: React.FC = () => {
     const link = document.createElement('a');
     link.setAttribute('href', url);
     link.setAttribute('download', `buku_induk_kependudukan_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportOccupationCsv = () => {
+    const csvContent = generateOccupationReportCsv(citizens, profile?.name || 'Desa');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `laporan_rekap_profesi_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -124,7 +152,7 @@ export const CitizensView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handleSync}
             disabled={isSyncing}
@@ -132,21 +160,32 @@ export const CitizensView: React.FC = () => {
             title="Muat data terbaru dari database Supabase"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-sky-600 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? 'Menyinkronkan...' : 'Segarkan Data'}</span>
+            <span className="hidden sm:inline">{isSyncing ? 'Menyinkronkan...' : 'Segarkan Data'}</span>
           </button>
 
           <button
             onClick={handleExportCsv}
-            className="flex items-center gap-2 px-4 py-2 bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold rounded-xl border border-slate-200 shadow-sm transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold rounded-xl border border-slate-200 shadow-sm transition-all"
+            title="Unduh seluruh data kependudukan ke file CSV"
           >
-            <Download className="w-4 h-4" />
-            Ekspor CSV
+            <Download className="w-4 h-4 text-slate-500" />
+            <span>Buku Induk CSV</span>
+          </button>
+
+          <button
+            onClick={handleExportOccupationCsv}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-xs font-bold rounded-xl border border-emerald-200 shadow-sm transition-all"
+            title="Unduh laporan rekapitulasi mata pencaharian / profesi siap serah dinas"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span className="hidden sm:inline">Ekspor Rekap Profesi</span>
+            <span className="sm:hidden">Rekap Profesi</span>
           </button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
         <button
           onClick={() => setActiveTab('all')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
@@ -185,6 +224,18 @@ export const CitizensView: React.FC = () => {
           <Home className="w-3.5 h-3.5" />
           <span>Buku Kartu Keluarga ({kkGroups.length} KK)</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('profesi')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'profesi'
+              ? 'bg-sky-600 text-white shadow-sm shadow-sky-600/20'
+              : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200/80'
+          }`}
+        >
+          <Briefcase className="w-3.5 h-3.5" />
+          <span>Rekap Profesi (Monografi)</span>
+        </button>
       </div>
 
       {/* Search & Filters */}
@@ -193,14 +244,14 @@ export const CitizensView: React.FC = () => {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Cari NIK, Nama, No. KK, atau Telepon..."
+            placeholder="Cari NIK, Nama, No. KK, atau Profesi..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-slate-50 text-xs text-slate-800 rounded-xl border border-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20"
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <Filter className="w-4 h-4 text-slate-400" />
           <select
             value={selectedDusun}
@@ -214,6 +265,31 @@ export const CitizensView: React.FC = () => {
               </option>
             ))}
           </select>
+
+          <select
+            value={selectedOccupation}
+            onChange={(e) => setSelectedOccupation(e.target.value)}
+            className="px-3 py-2 bg-slate-50 text-xs font-bold text-slate-700 rounded-xl border border-slate-200 focus:outline-none max-w-[190px] truncate"
+            title="Filter data warga berdasarkan profesi / mata pencaharian"
+          >
+            <option value="all">Semua Profesi</option>
+            {OCCUPATION_CATEGORIES.map((occ) => (
+              <option key={occ} value={occ}>
+                {occ}
+              </option>
+            ))}
+          </select>
+
+          {selectedOccupation !== 'all' && (
+            <button
+              onClick={() => setSelectedOccupation('all')}
+              className="flex items-center gap-1 text-[11px] font-bold text-rose-600 bg-rose-50 px-2 py-1.5 rounded-lg border border-rose-200 hover:bg-rose-100 transition-colors"
+              title="Reset filter profesi ke semua"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Reset Profesi</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -226,7 +302,7 @@ export const CitizensView: React.FC = () => {
                 <tr>
                   <th className="py-3.5 px-5">Identitas NIK & KK</th>
                   <th className="py-3.5 px-4">Nama Lengkap & Telepon</th>
-                  <th className="py-3.5 px-4">Peran Keluarga</th>
+                  <th className="py-3.5 px-4">Peran & Profesi</th>
                   <th className="py-3.5 px-4">Alamat Wilayah</th>
                   <th className="py-3.5 px-4">Berkas Terlampir</th>
                   <th className="py-3.5 px-4">Status Validasi</th>
@@ -240,7 +316,7 @@ export const CitizensView: React.FC = () => {
                       <Users className="w-10 h-10 mx-auto mb-2 text-slate-300 stroke-1" />
                       {activeTab === 'pending'
                         ? 'Tidak ada antrean validasi akun atau anggota keluarga baru saat ini.'
-                        : 'Belum ada data warga terdaftar.'}
+                        : 'Belum ada data warga terdaftar yang sesuai filter.'}
                     </td>
                   </tr>
                 ) : (
@@ -284,8 +360,8 @@ export const CitizensView: React.FC = () => {
                           <span className="font-semibold text-slate-800 block">
                             {citizen.status_dalam_keluarga || 'Kepala Keluarga'}
                           </span>
-                          <span className="text-[11px] text-slate-400">
-                            {citizen.pekerjaan || '-'}
+                          <span className="inline-flex items-center text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/70 mt-1">
+                            {citizen.pekerjaan || normalizeOccupation(citizen.pekerjaan)}
                           </span>
                         </td>
                         <td className="py-4 px-4 text-slate-600">
@@ -435,6 +511,188 @@ export const CitizensView: React.FC = () => {
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* VIEW MODE 3: REKAPITULASI MONOGRAFI PROFESI WARGA */}
+      {activeTab === 'profesi' && (
+        <div className="space-y-6">
+          {/* Quick Stat Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bento-card p-4 bg-emerald-50/50 border-emerald-200/80">
+              <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                <Briefcase className="w-4 h-4 text-emerald-600" />
+                Bekerja Produktif
+              </span>
+              <div className="text-2xl font-black text-emerald-950 font-mono mt-1">
+                {occupationSummary.workingCount}
+              </div>
+              <p className="text-[11px] text-emerald-700 mt-1">
+                {citizens.length > 0 ? ((occupationSummary.workingCount / citizens.length) * 100).toFixed(1) : 0}% dari total warga
+              </p>
+            </div>
+
+            <div className="bento-card p-4 bg-teal-50/50 border-teal-200/80">
+              <span className="text-xs font-bold text-teal-800 flex items-center gap-1.5">
+                <User className="w-4 h-4 text-teal-600" />
+                Pelajar / Mahasiswa
+              </span>
+              <div className="text-2xl font-black text-teal-950 font-mono mt-1">
+                {occupationSummary.studentCount}
+              </div>
+              <p className="text-[11px] text-teal-700 mt-1">
+                Usia pendidikan & kuota beasiswa
+              </p>
+            </div>
+
+            <div className="bento-card p-4 bg-pink-50/50 border-pink-200/80">
+              <span className="text-xs font-bold text-pink-800 flex items-center gap-1.5">
+                <Home className="w-4 h-4 text-pink-600" />
+                Ibu Rumah Tangga
+              </span>
+              <div className="text-2xl font-black text-pink-950 font-mono mt-1">
+                {occupationSummary.homemakerCount}
+              </div>
+              <p className="text-[11px] text-pink-700 mt-1">
+                Pengurus rumah tangga desa
+              </p>
+            </div>
+
+            <div className="bento-card p-4 bg-slate-100/70 border-slate-200/80">
+              <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <XCircle className="w-4 h-4 text-slate-500" />
+                Belum / Tdk Bekerja
+              </span>
+              <div className="text-2xl font-black text-slate-900 font-mono mt-1">
+                {occupationSummary.unemployedCount}
+              </div>
+              <p className="text-[11px] text-slate-600 mt-1">
+                Balita, lansia & pencari kerja
+              </p>
+            </div>
+          </div>
+
+          {/* Monografi Table */}
+          <div className="bento-card overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-emerald-600" />
+                  Tabel Monografi Mata Pencaharian / Profesi Penduduk
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Data resmi teragregasi berdasarkan pengelompokan standar Kemendagri & BPS untuk laporan dinas
+                </p>
+              </div>
+              <button
+                onClick={handleExportOccupationCsv}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm self-start sm:self-auto"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Unduh Format Laporan Dinas (CSV)
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider border-b border-slate-200/80">
+                  <tr>
+                    <th className="py-3.5 px-4 w-12 text-center">No</th>
+                    <th className="py-3.5 px-4">Kategori Profesi Standar</th>
+                    <th className="py-3.5 px-4 text-center">Laki-Laki</th>
+                    <th className="py-3.5 px-4 text-center">Perempuan</th>
+                    <th className="py-3.5 px-4 text-center">Total Jiwa</th>
+                    <th className="py-3.5 px-4 text-center">Persentase</th>
+                    <th className="py-3.5 px-5 text-right">Aksi Cepat</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {citizens.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                        Belum ada data warga terdaftar untuk dikelompokkan.
+                      </td>
+                    </tr>
+                  ) : (
+                    occupationSummary.stats.map((st, idx) => (
+                      <tr key={st.category} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3.5 px-4 text-center font-bold text-slate-400 font-mono">
+                          {idx + 1}
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-slate-900">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: st.color }} />
+                            <span>{st.category}</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-center font-mono text-slate-700">
+                          {st.maleCount}
+                        </td>
+                        <td className="py-3.5 px-4 text-center font-mono text-slate-700">
+                          {st.femaleCount}
+                        </td>
+                        <td className="py-3.5 px-4 text-center font-mono font-bold text-slate-900 text-sm">
+                          {st.count}
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <div className="inline-flex items-center gap-2">
+                            <div className="w-16 bg-slate-100 h-2 rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all"
+                                style={{
+                                  width: `${Math.max(st.percentage, 2)}%`,
+                                  backgroundColor: st.color,
+                                }}
+                              />
+                            </div>
+                            <span className="font-mono text-slate-600 font-bold">{st.percentage}%</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-5 text-right">
+                          <button
+                            onClick={() => {
+                              setSelectedOccupation(st.category);
+                              setActiveTab('all');
+                            }}
+                            className="px-3 py-1.5 text-[11px] font-bold text-sky-700 hover:text-sky-800 bg-sky-50 hover:bg-sky-100 border border-sky-200/80 rounded-lg transition-all"
+                            title={`Tampilkan daftar warga ${st.category}`}
+                          >
+                            Lihat Warga ({st.count})
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                {citizens.length > 0 && (
+                  <tfoot className="bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-200">
+                    <tr>
+                      <td colSpan={2} className="py-3.5 px-4 uppercase text-xs">
+                        Total Seluruh Warga Terdata
+                      </td>
+                      <td className="py-3.5 px-4 text-center font-mono">
+                        {citizens.filter((c) => c.jenis_kelamin === 'L').length}
+                      </td>
+                      <td className="py-3.5 px-4 text-center font-mono">
+                        {citizens.filter((c) => c.jenis_kelamin === 'P').length}
+                      </td>
+                      <td className="py-3.5 px-4 text-center font-mono text-base text-emerald-700">
+                        {citizens.length}
+                      </td>
+                      <td className="py-3.5 px-4 text-center font-mono">
+                        100.0%
+                      </td>
+                      <td className="py-3.5 px-5 text-right">
+                        <span className="text-[11px] text-slate-500 font-normal">
+                          {profile?.name || 'Pemerintah Desa'}
+                        </span>
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
