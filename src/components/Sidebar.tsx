@@ -46,7 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab, onOpen
   }[] = [
     {
       id: 'dashboard',
-      label: 'Dashboard Bento',
+      label: 'Dashboard',
       description: 'Ringkasan & Metrik Desa',
       icon: LayoutDashboard,
     },
@@ -109,15 +109,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab, onOpen
             <button
               key={item.id}
               onClick={() => onSelectTab(item.id)}
+              title={item.description}
               className={`w-full group flex items-center justify-between px-3.5 py-3 rounded-2xl text-left transition-all ${
                 isActive
                   ? 'bg-emerald-50 text-emerald-950 font-bold border border-emerald-200/90 shadow-sm'
                   : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent font-medium'
               }`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                 <div
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors shrink-0 ${
                     isActive
                       ? 'bg-emerald-600 text-white shadow-sm'
                       : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200 group-hover:text-slate-800'
@@ -125,25 +126,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab, onOpen
                 >
                   <Icon className="w-5 h-5" />
                 </div>
-                <div>
-                  <div className={`text-sm ${isActive ? 'text-emerald-950' : 'text-slate-800'}`}>
-                    {item.label}
-                  </div>
-                  <div className="text-[11px] text-slate-400 font-normal leading-tight">
-                    {item.description}
-                  </div>
-                </div>
+                <span
+                  className={`text-base tracking-tight truncate ${
+                    isActive ? 'font-bold text-emerald-950' : 'font-semibold text-slate-800 group-hover:text-slate-900'
+                  }`}
+                >
+                  {item.label}
+                </span>
               </div>
 
               {/* Badge if available */}
               {item.badge !== undefined && item.badge > 0 ? (
                 <span
-                  className={`px-2 py-0.5 text-xs font-bold rounded-full border ${item.badgeColor}`}
+                  className={`px-2 py-0.5 text-xs font-bold rounded-full border shrink-0 ${item.badgeColor}`}
                 >
                   {item.badge}
                 </span>
               ) : (
-                isActive && <ChevronRight className="w-4 h-4 text-emerald-600" />
+                isActive && <ChevronRight className="w-4 h-4 text-emerald-600 shrink-0" />
               )}
             </button>
           );
