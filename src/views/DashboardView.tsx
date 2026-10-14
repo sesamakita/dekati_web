@@ -400,7 +400,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             </div>
 
             {/* Quick Summary Badges */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-4">
               <div className="p-3 bg-emerald-50/70 border border-emerald-200/60 rounded-2xl">
                 <span className="text-[11px] font-bold text-emerald-800 block">Bekerja Produktif</span>
                 <span className="text-lg font-extrabold text-emerald-950 font-mono">
@@ -409,11 +409,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                 <span className="text-[10px] text-emerald-600 block mt-0.5">Jiwa</span>
               </div>
               <div className="p-3 bg-teal-50/70 border border-teal-200/60 rounded-2xl">
-                <span className="text-[11px] font-bold text-teal-800 block">Pelajar / Mahasiswa</span>
+                <span className="text-[11px] font-bold text-teal-800 block">Pelajar / Mhs</span>
                 <span className="text-lg font-extrabold text-teal-950 font-mono">
                   {occupationSummary.studentCount}
                 </span>
                 <span className="text-[10px] text-teal-600 block mt-0.5">Jiwa</span>
+              </div>
+              <div className="p-3 bg-amber-50/70 border border-amber-200/60 rounded-2xl">
+                <span className="text-[11px] font-bold text-amber-800 block">Pra-Sekolah / PAUD</span>
+                <span className="text-lg font-extrabold text-amber-950 font-mono">
+                  {occupationSummary.preschoolCount}
+                </span>
+                <span className="text-[10px] text-amber-600 block mt-0.5">Balita / Usia Dini</span>
               </div>
               <div className="p-3 bg-pink-50/70 border border-pink-200/60 rounded-2xl">
                 <span className="text-[11px] font-bold text-pink-800 block">Ibu Rumah Tangga</span>
@@ -423,11 +430,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                 <span className="text-[10px] text-pink-600 block mt-0.5">Jiwa</span>
               </div>
               <div className="p-3 bg-slate-100/70 border border-slate-200/60 rounded-2xl">
-                <span className="text-[11px] font-bold text-slate-700 block">Belum / Tdk Bekerja</span>
+                <span className="text-[11px] font-bold text-slate-700 block">Belum Bekerja</span>
                 <span className="text-lg font-extrabold text-slate-900 font-mono">
                   {occupationSummary.unemployedCount}
                 </span>
-                <span className="text-[10px] text-slate-500 block mt-0.5">Jiwa</span>
+                <span className="text-[10px] text-slate-500 block mt-0.5">Usia Kerja</span>
               </div>
             </div>
 

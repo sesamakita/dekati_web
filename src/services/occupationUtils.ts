@@ -5,6 +5,7 @@ export const OCCUPATION_CATEGORIES = [
   'PNS / ASN / PPPK',
   'TNI / POLRI',
   'Pelajar / Mahasiswa',
+  'Anak Pra-Sekolah / PAUD',
   'Petani / Pekebun / Peternak',
   'Nelayan / Perikanan',
   'Wiraswasta / Pedagang',
@@ -31,18 +32,20 @@ export interface OccupationSummary {
   totalCitizens: number;
   workingCount: number;
   studentCount: number;
+  preschoolCount: number;
   unemployedCount: number;
   homemakerCount: number;
   stats: OccupationStat[];
 }
 
-const CATEGORY_COLORS: Record<OccupationCategory, string> = {
+export const CATEGORY_COLORS: Record<OccupationCategory, string> = {
   'PNS / ASN / PPPK': '#2563EB',          // Blue
   'TNI / POLRI': '#1E3A8A',              // Navy
   'Pelajar / Mahasiswa': '#0D9488',      // Teal
+  'Anak Pra-Sekolah / PAUD': '#F59E0B',  // Amber (Golden/Warm)
   'Petani / Pekebun / Peternak': '#16A34A', // Green
   'Nelayan / Perikanan': '#0284C7',      // Sky
-  'Wiraswasta / Pedagang': '#D97706',    // Amber
+  'Wiraswasta / Pedagang': '#D97706',    // Dark Amber
   'Karyawan Swasta / BUMN': '#6366F1',   // Indigo
   'Buruh Harian Lepas': '#EA580C',       // Orange
   'Ibu Rumah Tangga': '#DB2777',         // Pink
@@ -52,14 +55,111 @@ const CATEGORY_COLORS: Record<OccupationCategory, string> = {
 };
 
 /**
- * Menormalkan variasi teks pekerjaan warga ke salah satu dari kategori standar Kemendagri / BPS
+ * Menghitung usia seseorang (tahun) berdasarkan tanggal lahir string atau 16-digit NIK
  */
-export function normalizeOccupation(raw?: string): OccupationCategory {
-  if (!raw || !raw.trim()) return 'Belum / Tidak Bekerja';
+export function calculateAge(birthDate?: string, nik?: string): number | null {
+  const today = new Date();
+
+  // 1. Ekstraksi dari birthDate
+  if (birthDate && birthDate.trim()) {
+    const parsed = new Date(birthDate);
+    if (!isNaN(parsed.getTime())) {
+      let age = today.getFullYear() - parsed.getFullYear();
+      const m = today.getMonth() - parsed.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < parsed.getDate())) {
+        age--;
+      }
+      if (age >= 0 && age <= 130) return age;
+    }
+
+    // Format DD-MM-YYYY atau DD/MM/YYYY
+    const parts = birthDate.split(/[-/]/);
+    if (parts.length === 3 && parts[0].length === 2 && parts[2].length === 4) {
+      const d = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const y = parseInt(parts[2], 10);
+      const parsed2 = new Date(y, m, d);
+      if (!isNaN(parsed2.getTime())) {
+        let age = today.getFullYear() - parsed2.getFullYear();
+        const mDiff = today.getMonth() - parsed2.getMonth();
+        if (mDiff < 0 || (mDiff === 0 && today.getDate() < parsed2.getDate())) {
+          age--;
+        }
+        if (age >= 0 && age <= 130) return age;
+      }
+    }
+  }
+
+  // 2. Ekstraksi cerdas dari NIK (16 digit)
+  // Format: [prov:2][kab:2][kec:2][tgl:2][bln:2][thn:2][urut:4]
+  // Catatan Kemendagri: Tanggal lahir wanita ditambah 40 (cth: tgl 21 -> 61)
+  if (nik && /^\d{16}$/.test(nik.trim())) {
+    const cleanNik = nik.trim();
+    let day = parseInt(cleanNik.slice(6, 8), 10);
+    if (day > 40) day -= 40;
+    const month = parseInt(cleanNik.slice(8, 10), 10) - 1;
+    const twoDigitYear = parseInt(cleanNik.slice(10, 12), 10);
+
+    const currentYear = today.getFullYear();
+    const currentTwoDigit = currentYear % 100;
+    // Jika 2 digit <= tahun berjalan (misal 24 -> 2024, 18 -> 2018), anggap abad 21
+    const year = twoDigitYear <= currentTwoDigit ? 2000 + twoDigitYear : 1900 + twoDigitYear;
+
+    const parsedNik = new Date(year, month, day);
+    if (!isNaN(parsedNik.getTime())) {
+      let age = today.getFullYear() - parsedNik.getFullYear();
+      const mDiff = today.getMonth() - parsedNik.getMonth();
+      if (mDiff < 0 || (mDiff === 0 && today.getDate() < parsedNik.getDate())) {
+        age--;
+      }
+      if (age >= 0 && age <= 130) return age;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Menormalkan variasi teks pekerjaan warga ke salah satu dari kategori standar Kemendagri / BPS.
+ * Mendukung auto-detection pra-sekolah / balita berbasis usia (< 7 tahun).
+ */
+export function normalizeOccupation(
+  raw?: string,
+  birthDate?: string,
+  nik?: string
+): OccupationCategory {
+  const age = calculateAge(birthDate, nik);
+
+  // Jika input kosong
+  if (!raw || !raw.trim()) {
+    if (age !== null && age < 7) {
+      return 'Anak Pra-Sekolah / PAUD';
+    }
+    return 'Belum / Tidak Bekerja';
+  }
   
   const text = raw.trim().toLowerCase();
 
-  // 1. TNI / POLRI
+  // 1. Deteksi Eksplisit Anak Pra-Sekolah / PAUD / TK / Balita
+  if (
+    text.includes('paud') ||
+    text.includes('pra sekolah') ||
+    text.includes('prasekolah') ||
+    text.includes('pra-sekolah') ||
+    text.includes('belum sekolah') ||
+    text.includes('taman kanak') ||
+    text.includes('balita') ||
+    text.includes('playgroup') ||
+    text.includes('kelompok bermain') ||
+    text === 'tk' ||
+    text.startsWith('tk ') ||
+    text.endsWith(' tk') ||
+    text.includes(' tk ')
+  ) {
+    return 'Anak Pra-Sekolah / PAUD';
+  }
+
+  // 2. TNI / POLRI
   if (
     text.includes('tni') ||
     text.includes('polri') ||
@@ -71,7 +171,7 @@ export function normalizeOccupation(raw?: string): OccupationCategory {
     return 'TNI / POLRI';
   }
 
-  // 2. PNS / ASN / PPPK
+  // 3. PNS / ASN / PPPK
   if (
     text.includes('pns') ||
     text.includes('asn') ||
@@ -84,7 +184,7 @@ export function normalizeOccupation(raw?: string): OccupationCategory {
     return 'PNS / ASN / PPPK';
   }
 
-  // 3. Pelajar / Mahasiswa
+  // 4. Pelajar / Mahasiswa
   if (
     text.includes('pelajar') ||
     text.includes('mahasiswa') ||
@@ -93,10 +193,14 @@ export function normalizeOccupation(raw?: string): OccupationCategory {
     text.includes('sekolah') ||
     text.includes('kuliah')
   ) {
+    // Jika usia di bawah 7 tahun, arahkan ke Pra-Sekolah / PAUD
+    if (age !== null && age < 7) {
+      return 'Anak Pra-Sekolah / PAUD';
+    }
     return 'Pelajar / Mahasiswa';
   }
 
-  // 4. Petani / Pekebun / Peternak
+  // 5. Petani / Pekebun / Peternak
   if (
     text.includes('petani') ||
     text.includes('pekebun') ||
@@ -108,7 +212,7 @@ export function normalizeOccupation(raw?: string): OccupationCategory {
     return 'Petani / Pekebun / Peternak';
   }
 
-  // 5. Nelayan / Perikanan
+  // 6. Nelayan / Perikanan
   if (
     text.includes('nelayan') ||
     text.includes('perikanan') ||
@@ -118,7 +222,7 @@ export function normalizeOccupation(raw?: string): OccupationCategory {
     return 'Nelayan / Perikanan';
   }
 
-  // 6. Ibu Rumah Tangga
+  // 7. Ibu Rumah Tangga
   if (
     text.includes('ibu rumah tangga') ||
     text.includes('mengurus rumah tangga') ||
@@ -128,24 +232,26 @@ export function normalizeOccupation(raw?: string): OccupationCategory {
     return 'Ibu Rumah Tangga';
   }
 
-  // 7. Pensiunan
+  // 8. Pensiunan
   if (text.includes('pensiun') || text.includes('purnawirawan')) {
     return 'Pensiunan';
   }
 
-  // 8. Belum / Tidak Bekerja
+  // 9. Belum / Tidak Bekerja (jika anak/balita < 7 tahun, kategorikan pra-sekolah)
   if (
     text.includes('belum') ||
     text.includes('tidak bekerja') ||
     text.includes('pengangguran') ||
     text.includes('belum/tidak') ||
-    text.includes('balita') ||
     text.includes('anak')
   ) {
+    if (age !== null && age < 7) {
+      return 'Anak Pra-Sekolah / PAUD';
+    }
     return 'Belum / Tidak Bekerja';
   }
 
-  // 9. Wiraswasta / Pedagang
+  // 10. Wiraswasta / Pedagang
   if (
     text.includes('wiraswasta') ||
     text.includes('pedagang') ||
@@ -160,7 +266,7 @@ export function normalizeOccupation(raw?: string): OccupationCategory {
     return 'Wiraswasta / Pedagang';
   }
 
-  // 10. Buruh Harian Lepas
+  // 11. Buruh Harian Lepas
   if (
     text.includes('buruh') ||
     text.includes('kuli') ||
@@ -172,7 +278,7 @@ export function normalizeOccupation(raw?: string): OccupationCategory {
     return 'Buruh Harian Lepas';
   }
 
-  // 11. Karyawan Swasta / BUMN
+  // 12. Karyawan Swasta / BUMN
   if (
     text.includes('karyawan') ||
     text.includes('swasta') ||
@@ -183,6 +289,11 @@ export function normalizeOccupation(raw?: string): OccupationCategory {
     text.includes('security')
   ) {
     return 'Karyawan Swasta / BUMN';
+  }
+
+  // Jika tidak cocok apa pun tapi usia < 7 tahun
+  if (age !== null && age < 7) {
+    return 'Anak Pra-Sekolah / PAUD';
   }
 
   return 'Lainnya';
@@ -197,6 +308,7 @@ export function aggregateOccupations(citizens: Citizen[]): OccupationSummary {
     'PNS / ASN / PPPK': { total: 0, male: 0, female: 0 },
     'TNI / POLRI': { total: 0, male: 0, female: 0 },
     'Pelajar / Mahasiswa': { total: 0, male: 0, female: 0 },
+    'Anak Pra-Sekolah / PAUD': { total: 0, male: 0, female: 0 },
     'Petani / Pekebun / Peternak': { total: 0, male: 0, female: 0 },
     'Nelayan / Perikanan': { total: 0, male: 0, female: 0 },
     'Wiraswasta / Pedagang': { total: 0, male: 0, female: 0 },
@@ -209,7 +321,7 @@ export function aggregateOccupations(citizens: Citizen[]): OccupationSummary {
   };
 
   citizens.forEach((c) => {
-    const category = normalizeOccupation(c.pekerjaan);
+    const category = normalizeOccupation(c.pekerjaan, c.tanggal_lahir, c.nik);
     countMap[category].total += 1;
     if (c.jenis_kelamin === 'L') {
       countMap[category].male += 1;
@@ -245,6 +357,7 @@ export function aggregateOccupations(citizens: Citizen[]): OccupationSummary {
     .reduce((acc, curr) => acc + curr.count, 0);
 
   const studentCount = countMap['Pelajar / Mahasiswa'].total;
+  const preschoolCount = countMap['Anak Pra-Sekolah / PAUD'].total;
   const unemployedCount = countMap['Belum / Tidak Bekerja'].total;
   const homemakerCount = countMap['Ibu Rumah Tangga'].total;
 
@@ -252,6 +365,7 @@ export function aggregateOccupations(citizens: Citizen[]): OccupationSummary {
     totalCitizens: total,
     workingCount,
     studentCount,
+    preschoolCount,
     unemployedCount,
     homemakerCount,
     stats,
@@ -288,11 +402,12 @@ export function generateOccupationReportCsv(citizens: Citizen[], villageName: st
     `"TOTAL","PENDUDUK TERDATA","${citizens.filter((c) => c.jenis_kelamin === 'L').length}","${citizens.filter((c) => c.jenis_kelamin === 'P').length}","${summary.totalCitizens}","100.0%"`
   );
   lines.push(`""`);
-  lines.push(`"RINGKASAN ANGKATAN KERJA"`);
+  lines.push(`"RINGKASAN DEMOGRAFI & ANGKATAN KERJA"`);
   lines.push(`"Total Penduduk Bekerja Produktif: ${summary.workingCount} Jiwa"`);
   lines.push(`"Total Pelajar / Mahasiswa: ${summary.studentCount} Jiwa"`);
+  lines.push(`"Total Anak Usia Dini / Pra-Sekolah (PAUD): ${summary.preschoolCount} Jiwa"`);
   lines.push(`"Total Pengurus Rumah Tangga: ${summary.homemakerCount} Jiwa"`);
-  lines.push(`"Total Belum / Tidak Bekerja: ${summary.unemployedCount} Jiwa"`);
+  lines.push(`"Total Belum / Tidak Bekerja (Usia Kerja): ${summary.unemployedCount} Jiwa"`);
 
   return lines.join('\n');
 }

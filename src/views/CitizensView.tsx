@@ -18,7 +18,8 @@ import {
   CreditCard,
   Briefcase,
   FileSpreadsheet,
-  X
+  X,
+  Baby
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { CitizenVerifyModal } from '../components/CitizenVerifyModal';
@@ -93,7 +94,7 @@ export const CitizensView: React.FC = () => {
     const matchesDusun = selectedDusun === 'all' ? true : c.dusun === selectedDusun;
     const matchesOccupation = selectedOccupation === 'all'
       ? true
-      : normalizeOccupation(c.pekerjaan) === selectedOccupation;
+      : normalizeOccupation(c.pekerjaan, c.tanggal_lahir, c.nik) === selectedOccupation;
 
     return matchesTab && matchesSearch && matchesDusun && matchesOccupation;
   });
@@ -112,7 +113,7 @@ export const CitizensView: React.FC = () => {
     const rows = citizens
       .map(
         (c) =>
-          `"${c.id}","${c.nik || ''}","${c.no_kk || ''}","${c.nama_lengkap || ''}","${c.jenis_kelamin || ''}","${c.status_dalam_keluarga || ''}","${c.pekerjaan || ''}","${normalizeOccupation(c.pekerjaan)}","${c.dusun || ''}","${c.rt || ''}","${c.rw || ''}","${c.phone_number || ''}","${c.is_verified ? 'Ya' : 'Belum'}"`
+          `"${c.id}","${c.nik || ''}","${c.no_kk || ''}","${c.nama_lengkap || ''}","${c.jenis_kelamin || ''}","${c.status_dalam_keluarga || ''}","${c.pekerjaan || ''}","${normalizeOccupation(c.pekerjaan, c.tanggal_lahir, c.nik)}","${c.dusun || ''}","${c.rt || ''}","${c.rw || ''}","${c.phone_number || ''}","${c.is_verified ? 'Ya' : 'Belum'}"`
       )
       .join('\n');
 
@@ -361,7 +362,7 @@ export const CitizensView: React.FC = () => {
                             {citizen.status_dalam_keluarga || 'Kepala Keluarga'}
                           </span>
                           <span className="inline-flex items-center text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/70 mt-1">
-                            {citizen.pekerjaan || normalizeOccupation(citizen.pekerjaan)}
+                            {citizen.pekerjaan || normalizeOccupation(citizen.pekerjaan, citizen.tanggal_lahir, citizen.nik)}
                           </span>
                         </td>
                         <td className="py-4 px-4 text-slate-600">
@@ -518,7 +519,7 @@ export const CitizensView: React.FC = () => {
       {activeTab === 'profesi' && (
         <div className="space-y-6">
           {/* Quick Stat Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             <div className="bento-card p-4 bg-emerald-50/50 border-emerald-200/80">
               <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
                 <Briefcase className="w-4 h-4 text-emerald-600" />
@@ -541,7 +542,20 @@ export const CitizensView: React.FC = () => {
                 {occupationSummary.studentCount}
               </div>
               <p className="text-[11px] text-teal-700 mt-1">
-                Usia pendidikan & kuota beasiswa
+                Usia pendidikan dasar - tinggi
+              </p>
+            </div>
+
+            <div className="bento-card p-4 bg-amber-50/50 border-amber-200/80">
+              <span className="text-xs font-bold text-amber-800 flex items-center gap-1.5">
+                <Baby className="w-4 h-4 text-amber-600" />
+                Pra-Sekolah / PAUD
+              </span>
+              <div className="text-2xl font-black text-amber-950 font-mono mt-1">
+                {occupationSummary.preschoolCount}
+              </div>
+              <p className="text-[11px] text-amber-700 mt-1">
+                Balita & usia dini (0-6 thn)
               </p>
             </div>
 
@@ -561,13 +575,13 @@ export const CitizensView: React.FC = () => {
             <div className="bento-card p-4 bg-slate-100/70 border-slate-200/80">
               <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                 <XCircle className="w-4 h-4 text-slate-500" />
-                Belum / Tdk Bekerja
+                Belum Bekerja
               </span>
               <div className="text-2xl font-black text-slate-900 font-mono mt-1">
                 {occupationSummary.unemployedCount}
               </div>
               <p className="text-[11px] text-slate-600 mt-1">
-                Balita, lansia & pencari kerja
+                Pencari kerja usia produktif
               </p>
             </div>
           </div>
