@@ -6,8 +6,10 @@ import {
   getEffectiveTemplate, 
   buildTemplateContext, 
   interpolateTemplateText,
-  DEFAULT_GARUDA_URL,
-  DEFAULT_KAB_LOGO_URL,
+  renderFullLetterHtml,
+  DEFAULT_GARUDA_DATA_URI,
+  DEFAULT_KAB_LOGO_DATA_URI,
+  DEFAULT_DESA_LOGO_DATA_URI,
 } from '../utils/letterTemplateEngine';
 
 interface LetterPrintModalProps {
@@ -23,12 +25,56 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({
   templates,
   onClose 
 }) => {
-  const handlePrint = () => {
-    window.print();
-  };
-
   const effectiveTemplate = getEffectiveTemplate(letter.letter_name, templates);
   const context = buildTemplateContext(letter, profile, effectiveTemplate.signer_role);
+
+  const handlePrint = () => {
+    try {
+      const fullHtml = renderFullLetterHtml({
+        letter,
+        profile,
+        template: effectiveTemplate,
+      });
+
+      // Buka iframe terisolasi agar cetak PDF bersih tanpa gangguan backdrop modal
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.setAttribute('title', 'Cetak Dokumen Resmi');
+      document.body.appendChild(iframe);
+
+      const frameDoc = iframe.contentWindow?.document;
+      if (frameDoc) {
+        frameDoc.open();
+        frameDoc.write(fullHtml);
+        frameDoc.close();
+
+        iframe.contentWindow?.focus();
+        setTimeout(() => {
+          try {
+            iframe.contentWindow?.print();
+          } catch (printErr) {
+            console.warn('[LetterPrintModal] Iframe print failed, falling back to window.print():', printErr);
+            window.print();
+          }
+          setTimeout(() => {
+            try {
+              document.body.removeChild(iframe);
+            } catch (_) {}
+          }, 2000);
+        }, 300);
+      } else {
+        window.print();
+      }
+    } catch (err) {
+      console.error('[LetterPrintModal] Error generating print html:', err);
+      window.print();
+    }
+  };
 
   const headerConfig = effectiveTemplate.header_config || {
     font_family: 'Times New Roman',
@@ -41,9 +87,9 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({
   const showDesa = (headerConfig.show_desa_logo || logoLayout === 'dual_logo') && logoLayout !== 'no_logo' && logoLayout !== 'center_garuda';
   const showGaruda = logoLayout === 'center_garuda' || Boolean(headerConfig.show_garuda_logo);
 
-  const kabLogoUrl = headerConfig.kab_logo_url || profile.logo_kabupaten_url || DEFAULT_KAB_LOGO_URL;
-  const desaLogoUrl = headerConfig.desa_logo_url || profile.logo_desa_url || '';
-  const garudaLogoUrl = headerConfig.garuda_logo_url || DEFAULT_GARUDA_URL;
+  const kabLogoUrl = headerConfig.kab_logo_url || profile.logo_kabupaten_url || DEFAULT_KAB_LOGO_DATA_URI;
+  const desaLogoUrl = headerConfig.desa_logo_url || profile.logo_desa_url || (headerConfig.show_desa_logo || logoLayout === 'dual_logo' ? DEFAULT_DESA_LOGO_DATA_URI : '');
+  const garudaLogoUrl = headerConfig.garuda_logo_url || DEFAULT_GARUDA_DATA_URI;
 
   const hasLeftLogo = showKab && Boolean(kabLogoUrl);
   const hasRightLogo = showDesa && Boolean(desaLogoUrl);
@@ -122,7 +168,14 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({
                   src={garudaLogoUrl}
                   alt="Garuda Pancasila"
                   className="h-16 w-16 object-contain"
-                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                  crossOrigin="anonymous"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    if (target.src !== DEFAULT_GARUDA_DATA_URI) {
+                      target.src = DEFAULT_GARUDA_DATA_URI;
+                    }
+                  }}
                 />
               </div>
             )}
@@ -133,7 +186,14 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({
                     src={kabLogoUrl}
                     alt="Logo Pemda"
                     className="max-h-16 max-w-16 object-contain"
-                    onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                    crossOrigin="anonymous"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (target.src !== DEFAULT_KAB_LOGO_DATA_URI) {
+                        target.src = DEFAULT_KAB_LOGO_DATA_URI;
+                      }
+                    }}
                   />
                 </div>
               ) : hasRightLogo ? (
@@ -164,7 +224,14 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({
                     src={desaLogoUrl}
                     alt="Logo Desa"
                     className="max-h-16 max-w-16 object-contain"
-                    onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                    crossOrigin="anonymous"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (target.src !== DEFAULT_DESA_LOGO_DATA_URI) {
+                        target.src = DEFAULT_DESA_LOGO_DATA_URI;
+                      }
+                    }}
                   />
                 </div>
               ) : hasLeftLogo ? (

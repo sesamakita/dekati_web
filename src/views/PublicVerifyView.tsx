@@ -284,6 +284,7 @@ export const PublicVerifyView: React.FC = () => {
         <LetterPrintModal
           letter={letter}
           profile={profile}
+          templates={dataService.getLetterTemplates()}
           onClose={() => setShowPrintModal(false)}
         />
       )}

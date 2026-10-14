@@ -28,7 +28,7 @@ interface LetterDetailModalProps {
 }
 
 export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter, onClose }) => {
-  const { updateLetterStatus, activeRole, profile } = useData();
+  const { updateLetterStatus, activeRole, profile, letterTemplates } = useData();
   const [officialNumber, setOfficialNumber] = useState(
     letter.letter_official_number ||
       `470/${Math.floor(10 + Math.random() * 90)}/${letter.letter_name.split('(')[1]?.replace(')', '') || 'SK'}/IX/2026`
@@ -388,6 +388,7 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter, on
         <LetterPrintModal
           letter={letter}
           profile={profile}
+          templates={letterTemplates}
           onClose={() => setShowPrintModal(false)}
         />
       )}

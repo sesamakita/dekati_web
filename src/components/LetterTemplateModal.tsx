@@ -22,6 +22,9 @@ import {
   buildTemplateContext,
   DEFAULT_GARUDA_URL,
   DEFAULT_KAB_LOGO_URL,
+  DEFAULT_GARUDA_DATA_URI,
+  DEFAULT_KAB_LOGO_DATA_URI,
+  DEFAULT_DESA_LOGO_DATA_URI,
 } from '../utils/letterTemplateEngine';
 
 interface LetterTemplateModalProps {
@@ -194,10 +197,10 @@ export const LetterTemplateModal: React.FC<LetterTemplateModalProps> = ({
 
   const showGarudaPreview = logoLayout === 'center_garuda';
   const showLeftPreview = (logoLayout === 'standard_left' || logoLayout === 'dual_logo');
-  const showRightPreview = logoLayout === 'dual_logo' && Boolean(desaLogoUrl);
+  const showRightPreview = logoLayout === 'dual_logo';
 
-  const effectiveKabLogoPreview = kabLogoUrl || profile.logo_kabupaten_url || DEFAULT_KAB_LOGO_URL;
-  const effectiveDesaLogoPreview = desaLogoUrl || profile.logo_desa_url || '';
+  const effectiveKabLogoPreview = kabLogoUrl || profile.logo_kabupaten_url || DEFAULT_KAB_LOGO_DATA_URI;
+  const effectiveDesaLogoPreview = desaLogoUrl || profile.logo_desa_url || (logoLayout === 'dual_logo' ? DEFAULT_DESA_LOGO_DATA_URI : '');
 
   const previewBorderClass =
     borderStyle === 'none'
@@ -631,10 +634,17 @@ export const LetterTemplateModal: React.FC<LetterTemplateModalProps> = ({
                 {showGarudaPreview && (
                   <div className="flex justify-center mb-2">
                     <img
-                      src={DEFAULT_GARUDA_URL}
+                      src={DEFAULT_GARUDA_DATA_URI}
                       alt="Garuda Pancasila"
                       className="h-12 w-12 object-contain"
-                      onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                      crossOrigin="anonymous"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (target.src !== DEFAULT_GARUDA_DATA_URI) {
+                          target.src = DEFAULT_GARUDA_DATA_URI;
+                        }
+                      }}
                     />
                   </div>
                 )}
@@ -645,7 +655,14 @@ export const LetterTemplateModal: React.FC<LetterTemplateModalProps> = ({
                         src={effectiveKabLogoPreview}
                         alt="Logo Pemda"
                         className="max-h-12 max-w-12 object-contain"
-                        onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                        crossOrigin="anonymous"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          if (target.src !== DEFAULT_KAB_LOGO_DATA_URI) {
+                            target.src = DEFAULT_KAB_LOGO_DATA_URI;
+                          }
+                        }}
                       />
                     </div>
                   ) : showRightPreview ? (
@@ -676,7 +693,14 @@ export const LetterTemplateModal: React.FC<LetterTemplateModalProps> = ({
                         src={effectiveDesaLogoPreview}
                         alt="Logo Desa"
                         className="max-h-12 max-w-12 object-contain"
-                        onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                        crossOrigin="anonymous"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          if (target.src !== DEFAULT_DESA_LOGO_DATA_URI) {
+                            target.src = DEFAULT_DESA_LOGO_DATA_URI;
+                          }
+                        }}
                       />
                     </div>
                   ) : showLeftPreview ? (
