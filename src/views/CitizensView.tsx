@@ -153,34 +153,33 @@ export const CitizensView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           <button
             onClick={handleSync}
             disabled={isSyncing}
-            className="flex items-center gap-2 px-3.5 py-2 bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold rounded-xl border border-slate-200 shadow-sm transition-all disabled:opacity-50"
-            title="Muat data terbaru dari database Supabase"
+            className="p-2.5 bg-white text-slate-700 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 rounded-xl border border-slate-200 shadow-sm transition-all disabled:opacity-50 flex items-center justify-center"
+            title="Segarkan Data (Muat data terbaru dari database)"
+            aria-label="Segarkan Data"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-sky-600 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{isSyncing ? 'Menyinkronkan...' : 'Segarkan Data'}</span>
+            <RefreshCw className={`w-4 h-4 text-sky-600 ${isSyncing ? 'animate-spin' : ''}`} />
           </button>
 
           <button
             onClick={handleExportCsv}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold rounded-xl border border-slate-200 shadow-sm transition-all"
-            title="Unduh seluruh data kependudukan ke file CSV"
+            className="p-2.5 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 rounded-xl border border-slate-200 shadow-sm transition-all flex items-center justify-center"
+            title="Ekspor Buku Induk Kependudukan (CSV)"
+            aria-label="Ekspor Buku Induk Kependudukan"
           >
-            <Download className="w-4 h-4 text-slate-500" />
-            <span>Buku Induk CSV</span>
+            <Download className="w-4 h-4 text-slate-600" />
           </button>
 
           <button
             onClick={handleExportOccupationCsv}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-xs font-bold rounded-xl border border-emerald-200 shadow-sm transition-all"
-            title="Unduh laporan rekapitulasi mata pencaharian / profesi siap serah dinas"
+            className="p-2.5 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 hover:border-emerald-300 rounded-xl border border-emerald-200 shadow-sm transition-all flex items-center justify-center"
+            title="Ekspor Rekap Profesi & Monografi Warga (CSV Dinas)"
+            aria-label="Ekspor Rekap Profesi"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            <span className="hidden sm:inline">Ekspor Rekap Profesi</span>
-            <span className="sm:hidden">Rekap Profesi</span>
           </button>
         </div>
       </div>
