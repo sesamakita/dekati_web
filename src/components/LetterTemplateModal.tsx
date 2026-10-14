@@ -14,12 +14,14 @@ import {
   Info,
   Type
 } from 'lucide-react';
-import { LetterTemplate, VillageProfile } from '../types';
+import { LetterTemplate, LetterLogoLayout, VillageProfile } from '../types';
 import { 
   DEFAULT_TEMPLATES, 
   AVAILABLE_PLACEHOLDERS, 
   interpolateTemplateText, 
-  buildTemplateContext 
+  buildTemplateContext,
+  DEFAULT_GARUDA_URL,
+  DEFAULT_KAB_LOGO_URL,
 } from '../utils/letterTemplateEngine';
 
 interface LetterTemplateModalProps {
@@ -52,6 +54,9 @@ export const LetterTemplateModal: React.FC<LetterTemplateModalProps> = ({
   const [fontFamily, setFontFamily] = useState<'Times New Roman' | 'Bookman Old Style' | 'Arial'>('Times New Roman');
   const [lineSpacing, setLineSpacing] = useState(1.5);
   const [borderStyle, setBorderStyle] = useState<'double' | 'single' | 'none'>('double');
+  const [logoLayout, setLogoLayout] = useState<LetterLogoLayout>('standard_left');
+  const [kabLogoUrl, setKabLogoUrl] = useState('');
+  const [desaLogoUrl, setDesaLogoUrl] = useState('');
 
   const [isSaving, setIsSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -81,8 +86,15 @@ export const LetterTemplateModal: React.FC<LetterTemplateModalProps> = ({
       setFontFamily(base.header_config.font_family || 'Times New Roman');
       setLineSpacing(base.header_config.line_spacing || 1.5);
       setBorderStyle(base.header_config.border_style || 'double');
+      setLogoLayout(base.header_config.logo_layout || 'standard_left');
+      setKabLogoUrl(base.header_config.kab_logo_url || profile.logo_kabupaten_url || '');
+      setDesaLogoUrl(base.header_config.desa_logo_url || profile.logo_desa_url || '');
+    } else {
+      setLogoLayout('standard_left');
+      setKabLogoUrl(profile.logo_kabupaten_url || '');
+      setDesaLogoUrl(profile.logo_desa_url || '');
     }
-  }, [selectedTypeCode, templates]);
+  }, [selectedTypeCode, templates, profile]);
 
   if (!isOpen || typeof document === 'undefined') return null;
 
@@ -136,8 +148,12 @@ export const LetterTemplateModal: React.FC<LetterTemplateModalProps> = ({
         closing_text: closingText,
         signer_role: signerRole,
         header_config: {
-          show_kab_logo: true,
-          show_desa_logo: true,
+          show_kab_logo: logoLayout === 'standard_left' || logoLayout === 'dual_logo',
+          show_desa_logo: logoLayout === 'dual_logo',
+          show_garuda_logo: logoLayout === 'center_garuda',
+          logo_layout: logoLayout,
+          kab_logo_url: kabLogoUrl,
+          desa_logo_url: desaLogoUrl,
           font_family: fontFamily,
           line_spacing: lineSpacing,
           border_style: borderStyle,
@@ -175,6 +191,13 @@ export const LetterTemplateModal: React.FC<LetterTemplateModalProps> = ({
   const previewOpening = interpolateTemplateText(openingText, sampleContext);
   const previewDeclaration = interpolateTemplateText(declarationText, sampleContext);
   const previewClosing = interpolateTemplateText(closingText, sampleContext);
+
+  const showGarudaPreview = logoLayout === 'center_garuda';
+  const showLeftPreview = (logoLayout === 'standard_left' || logoLayout === 'dual_logo');
+  const showRightPreview = logoLayout === 'dual_logo' && Boolean(desaLogoUrl);
+
+  const effectiveKabLogoPreview = kabLogoUrl || profile.logo_kabupaten_url || DEFAULT_KAB_LOGO_URL;
+  const effectiveDesaLogoPreview = desaLogoUrl || profile.logo_desa_url || '';
 
   const previewBorderClass =
     borderStyle === 'none'
@@ -402,6 +425,97 @@ export const LetterTemplateModal: React.FC<LetterTemplateModalProps> = ({
             ) : (
               /* Header & Typography Configuration Tab */
               <div className="space-y-5">
+                {/* Logo Layout Configuration */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-2">
+                    Tata Letak Logo Kop Surat (Sesuai Naskah Dinas Daerah)
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-3">
+                    {[
+                      { id: 'standard_left', label: 'Standar Pemkab', desc: 'Logo Kab di Kiri', badge: 'Permendagri' },
+                      { id: 'dual_logo', label: 'Dual Logo', desc: 'Kiri: Kab, Kanan: Desa', badge: 'Perdes' },
+                      { id: 'center_garuda', label: 'Garuda Pancasila', desc: 'Tengah (Pilihan SK)', badge: 'Khusus SK' },
+                      { id: 'no_logo', label: 'Tanpa Logo', desc: 'Hanya Teks Kop', badge: 'Polos' },
+                    ].map((l) => (
+                      <button
+                        key={l.id}
+                        type="button"
+                        onClick={() => setLogoLayout(l.id as any)}
+                        className={`p-3 rounded-2xl border text-left transition-all ${
+                          logoLayout === l.id
+                            ? 'border-emerald-600 bg-emerald-50/50 text-emerald-900 shadow-sm ring-1 ring-emerald-500'
+                            : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-bold">{l.label}</span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold">{l.badge}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400">{l.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {(logoLayout === 'standard_left' || logoLayout === 'dual_logo') && (
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5 mb-3">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[11px] font-bold text-slate-700">
+                            URL Lambang Daerah Kabupaten / Kota (Kiri):
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setKabLogoUrl(DEFAULT_KAB_LOGO_URL)}
+                            className="text-[10px] text-emerald-600 hover:underline"
+                          >
+                            Pakai Contoh Pemkab
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={kabLogoUrl}
+                          onChange={(e) => setKabLogoUrl(e.target.value)}
+                          placeholder="https://.../lambang-kabupaten.png"
+                          className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                        />
+                      </div>
+
+                      {logoLayout === 'dual_logo' && (
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[11px] font-bold text-slate-700">
+                              URL Lambang Resmi Desa (Kanan):
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setDesaLogoUrl('/logo.svg')}
+                              className="text-[10px] text-emerald-600 hover:underline"
+                            >
+                              Pakai Logo Desa Dekati
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            value={desaLogoUrl}
+                            onChange={(e) => setDesaLogoUrl(e.target.value)}
+                            placeholder="https://.../logo-desa.png"
+                            className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {logoLayout === 'center_garuda' && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 mb-3 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>
+                        Lambang <strong>Garuda Pancasila</strong> resmi disertakan secara otomatis di bagian tengah atas kop dokumen (ideal untuk Keputusan Kades).
+                      </span>
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-2">
                     Jenis Font Naskah Dinas (Sesuai Perbup / Perwal)
@@ -513,22 +627,62 @@ export const LetterTemplateModal: React.FC<LetterTemplateModalProps> = ({
               }}
             >
               {/* Kop Surat Live Preview */}
-              <div className={`text-center mb-5 ${previewBorderClass}`}>
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-700 font-sans">
-                  {profile.regency ? `PEMERINTAH ${profile.regency.toUpperCase()}` : 'PEMERINTAH KABUPATEN'}
-                </h4>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 font-sans">
-                  {profile.district ? `KECAMATAN ${profile.district.toUpperCase()}` : 'KECAMATAN'}
-                </h3>
-                <h2 className="text-base font-extrabold uppercase tracking-wide text-slate-950 font-sans">
-                  {profile.name ? `PEMERINTAH ${profile.name.toUpperCase()}` : 'PEMERINTAH DESA'}
-                </h2>
-                <p className="text-[9.5px] text-slate-600 mt-0.5 font-sans">
-                  {[profile.office_address, profile.office_phone ? `Telp: ${profile.office_phone}` : ''].filter(Boolean).join(' • ') || 'Alamat Kantor Pemerintahan Desa'}
-                </p>
-                <p className="text-[9px] text-slate-500 font-sans">
-                  Email: {profile.office_email || 'sekretariat@desa.id'}
-                </p>
+              <div className={`mb-5 ${previewBorderClass}`}>
+                {showGarudaPreview && (
+                  <div className="flex justify-center mb-2">
+                    <img
+                      src={DEFAULT_GARUDA_URL}
+                      alt="Garuda Pancasila"
+                      className="h-12 w-12 object-contain"
+                      onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                    />
+                  </div>
+                )}
+                <div className="flex items-center justify-between gap-3">
+                  {showLeftPreview ? (
+                    <div className="w-12 h-12 flex items-center justify-center shrink-0">
+                      <img
+                        src={effectiveKabLogoPreview}
+                        alt="Logo Pemda"
+                        className="max-h-12 max-w-12 object-contain"
+                        onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                      />
+                    </div>
+                  ) : showRightPreview ? (
+                    <div className="w-12 shrink-0" />
+                  ) : null}
+
+                  <div className="flex-1 text-center">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-700 font-sans">
+                      {profile.regency ? `PEMERINTAH ${profile.regency.toUpperCase()}` : 'PEMERINTAH KABUPATEN'}
+                    </h4>
+                    <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-800 font-sans">
+                      {profile.district ? `KECAMATAN ${profile.district.toUpperCase()}` : 'KECAMATAN'}
+                    </h3>
+                    <h2 className="text-sm font-extrabold uppercase tracking-wide text-slate-950 font-sans">
+                      {profile.name ? `PEMERINTAH ${profile.name.toUpperCase()}` : 'PEMERINTAH DESA'}
+                    </h2>
+                    <p className="text-[9px] text-slate-600 mt-0.5 font-sans leading-tight">
+                      {[profile.office_address, profile.office_phone ? `Telp: ${profile.office_phone}` : ''].filter(Boolean).join(' • ') || 'Alamat Kantor Pemerintahan Desa'}
+                    </p>
+                    <p className="text-[8.5px] text-slate-500 font-sans">
+                      Email: {profile.office_email || 'sekretariat@desa.id'}
+                    </p>
+                  </div>
+
+                  {showRightPreview ? (
+                    <div className="w-12 h-12 flex items-center justify-center shrink-0">
+                      <img
+                        src={effectiveDesaLogoPreview}
+                        alt="Logo Desa"
+                        className="max-h-12 max-w-12 object-contain"
+                        onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                      />
+                    </div>
+                  ) : showLeftPreview ? (
+                    <div className="w-12 shrink-0" />
+                  ) : null}
+                </div>
               </div>
 
               {/* Title & Official Number */}

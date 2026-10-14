@@ -5,7 +5,9 @@ import { LetterRequest, LetterTemplate, VillageProfile } from '../types';
 import { 
   getEffectiveTemplate, 
   buildTemplateContext, 
-  interpolateTemplateText 
+  interpolateTemplateText,
+  DEFAULT_GARUDA_URL,
+  DEFAULT_KAB_LOGO_URL,
 } from '../utils/letterTemplateEngine';
 
 interface LetterPrintModalProps {
@@ -33,6 +35,18 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({
     line_spacing: 1.5,
     border_style: 'double',
   };
+
+  const logoLayout = headerConfig.logo_layout || 'standard_left';
+  const showKab = headerConfig.show_kab_logo !== false && logoLayout !== 'no_logo' && logoLayout !== 'center_garuda';
+  const showDesa = (headerConfig.show_desa_logo || logoLayout === 'dual_logo') && logoLayout !== 'no_logo' && logoLayout !== 'center_garuda';
+  const showGaruda = logoLayout === 'center_garuda' || Boolean(headerConfig.show_garuda_logo);
+
+  const kabLogoUrl = headerConfig.kab_logo_url || profile.logo_kabupaten_url || DEFAULT_KAB_LOGO_URL;
+  const desaLogoUrl = headerConfig.desa_logo_url || profile.logo_desa_url || '';
+  const garudaLogoUrl = headerConfig.garuda_logo_url || DEFAULT_GARUDA_URL;
+
+  const hasLeftLogo = showKab && Boolean(kabLogoUrl);
+  const hasRightLogo = showDesa && Boolean(desaLogoUrl);
 
   const previewBorderClass =
     headerConfig.border_style === 'none'
@@ -102,11 +116,31 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({
           >
           {/* Official Village Letterhead (KOP SURAT) */}
           <div className={`text-center mb-6 relative ${previewBorderClass}`}>
-            <div className="flex items-center justify-center gap-5">
-              <div className="w-16 h-16 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center shrink-0">
-                <span className="text-2xl font-bold font-sans text-emerald-800">DS</span>
+            {showGaruda && (
+              <div className="flex justify-center mb-3">
+                <img
+                  src={garudaLogoUrl}
+                  alt="Garuda Pancasila"
+                  className="h-16 w-16 object-contain"
+                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                />
               </div>
-              <div>
+            )}
+            <div className="flex items-center justify-between gap-4">
+              {hasLeftLogo ? (
+                <div className="w-16 h-16 flex items-center justify-center shrink-0">
+                  <img
+                    src={kabLogoUrl}
+                    alt="Logo Pemda"
+                    className="max-h-16 max-w-16 object-contain"
+                    onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                  />
+                </div>
+              ) : hasRightLogo ? (
+                <div className="w-16 shrink-0" />
+              ) : null}
+
+              <div className="flex-1 text-center">
                 <h4 className="text-xs tracking-wider font-sans font-bold uppercase text-slate-700">
                   {profile.regency ? `PEMERINTAH ${profile.regency.toUpperCase()}` : 'PEMERINTAH KABUPATEN'}
                 </h4>
@@ -123,6 +157,19 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({
                   Email: {profile.office_email || 'sekretariat@desa.id'}
                 </p>
               </div>
+
+              {hasRightLogo ? (
+                <div className="w-16 h-16 flex items-center justify-center shrink-0">
+                  <img
+                    src={desaLogoUrl}
+                    alt="Logo Desa"
+                    className="max-h-16 max-w-16 object-contain"
+                    onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                  />
+                </div>
+              ) : hasLeftLogo ? (
+                <div className="w-16 shrink-0" />
+              ) : null}
             </div>
           </div>
 

@@ -11,9 +11,12 @@ CREATE TABLE IF NOT EXISTS public.letter_templates (
     title_format VARCHAR(255) NOT NULL,
     header_config JSONB NOT NULL DEFAULT '{
         "show_kab_logo": true,
-        "show_desa_logo": true,
+        "show_desa_logo": false,
+        "show_garuda_logo": false,
+        "logo_layout": "standard_left",
         "kab_logo_url": "",
         "desa_logo_url": "",
+        "garuda_logo_url": "",
         "font_family": "Times New Roman",
         "line_spacing": 1.5,
         "border_style": "double"
@@ -28,6 +31,12 @@ CREATE TABLE IF NOT EXISTS public.letter_templates (
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(village_code, letter_type_code)
 );
+
+-- Penambahan Kolom Logo pada Profil Desa (jika tabel village_profiles ada)
+ALTER TABLE IF EXISTS public.village_profiles 
+ADD COLUMN IF NOT EXISTS logo_kabupaten_url TEXT,
+ADD COLUMN IF NOT EXISTS logo_desa_url TEXT,
+ADD COLUMN IF NOT EXISTS logo_provinsi_url TEXT;
 
 -- Indexing
 CREATE INDEX IF NOT EXISTS idx_letter_templates_village ON public.letter_templates(village_code);

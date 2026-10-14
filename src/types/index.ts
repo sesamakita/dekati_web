@@ -227,13 +227,21 @@ export interface VillageProfile {
   sekdes_name: string;
   vision: string;
   mission: string[];
+  logo_kabupaten_url?: string;
+  logo_desa_url?: string;
+  logo_provinsi_url?: string;
 }
 
+export type LetterLogoLayout = 'standard_left' | 'dual_logo' | 'center_garuda' | 'no_logo';
+
 export interface LetterTemplateHeaderConfig {
-  show_kab_logo: boolean;
-  show_desa_logo: boolean;
+  show_kab_logo?: boolean;
+  show_desa_logo?: boolean;
+  show_garuda_logo?: boolean;
+  logo_layout?: LetterLogoLayout;
   kab_logo_url?: string;
   desa_logo_url?: string;
+  garuda_logo_url?: string;
   font_family: 'Times New Roman' | 'Bookman Old Style' | 'Arial';
   line_spacing: number;
   border_style: 'double' | 'single' | 'none';

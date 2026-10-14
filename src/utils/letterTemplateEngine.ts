@@ -16,6 +16,12 @@ export const AVAILABLE_PLACEHOLDERS = [
   { tag: '{{jabatan_penandatangan}}', label: 'Jabatan Penandatangan', desc: 'Kepala Desa / a.n. Sekretaris Desa' },
 ];
 
+export const DEFAULT_GARUDA_URL =
+  'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/National_emblem_of_Indonesia_Garuda_Pancasila.svg/240px-National_emblem_of_Indonesia_Garuda_Pancasila.svg.png';
+
+export const DEFAULT_KAB_LOGO_URL =
+  'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Lambang_Kabupaten_Bandung.png/240px-Lambang_Kabupaten_Bandung.png';
+
 export const DEFAULT_TEMPLATES: Record<string, LetterTemplate> = {
   DEFAULT: {
     letter_type_code: 'DEFAULT',
@@ -23,7 +29,9 @@ export const DEFAULT_TEMPLATES: Record<string, LetterTemplate> = {
     title_format: 'SURAT KETERANGAN',
     header_config: {
       show_kab_logo: true,
-      show_desa_logo: true,
+      show_desa_logo: false,
+      show_garuda_logo: false,
+      logo_layout: 'standard_left',
       font_family: 'Times New Roman',
       line_spacing: 1.5,
       border_style: 'double',
@@ -42,7 +50,9 @@ export const DEFAULT_TEMPLATES: Record<string, LetterTemplate> = {
     title_format: 'SURAT KETERANGAN TIDAK MAMPU',
     header_config: {
       show_kab_logo: true,
-      show_desa_logo: true,
+      show_desa_logo: false,
+      show_garuda_logo: false,
+      logo_layout: 'standard_left',
       font_family: 'Times New Roman',
       line_spacing: 1.5,
       border_style: 'double',
@@ -61,7 +71,9 @@ export const DEFAULT_TEMPLATES: Record<string, LetterTemplate> = {
     title_format: 'SURAT KETERANGAN USAHA',
     header_config: {
       show_kab_logo: true,
-      show_desa_logo: true,
+      show_desa_logo: false,
+      show_garuda_logo: false,
+      logo_layout: 'standard_left',
       font_family: 'Times New Roman',
       line_spacing: 1.5,
       border_style: 'double',
@@ -80,7 +92,9 @@ export const DEFAULT_TEMPLATES: Record<string, LetterTemplate> = {
     title_format: 'SURAT PENGANTAR CATATAN KEPOLISIAN',
     header_config: {
       show_kab_logo: true,
-      show_desa_logo: true,
+      show_desa_logo: false,
+      show_garuda_logo: false,
+      logo_layout: 'standard_left',
       font_family: 'Times New Roman',
       line_spacing: 1.5,
       border_style: 'double',
@@ -99,7 +113,9 @@ export const DEFAULT_TEMPLATES: Record<string, LetterTemplate> = {
     title_format: 'SURAT KETERANGAN DOMISILI',
     header_config: {
       show_kab_logo: true,
-      show_desa_logo: true,
+      show_desa_logo: false,
+      show_garuda_logo: false,
+      logo_layout: 'standard_left',
       font_family: 'Times New Roman',
       line_spacing: 1.5,
       border_style: 'double',
@@ -211,6 +227,18 @@ export function renderFullLetterHtml(params: {
   const vPostal = profile.postal_code ? `Kode Pos: ${profile.postal_code}` : '';
 
   const headerConfig = effectiveTemplate.header_config || DEFAULT_TEMPLATES.DEFAULT.header_config;
+  const logoLayout = headerConfig.logo_layout || 'standard_left';
+  const showKab = headerConfig.show_kab_logo !== false && logoLayout !== 'no_logo' && logoLayout !== 'center_garuda';
+  const showDesa = (headerConfig.show_desa_logo || logoLayout === 'dual_logo') && logoLayout !== 'no_logo' && logoLayout !== 'center_garuda';
+  const showGaruda = logoLayout === 'center_garuda' || Boolean(headerConfig.show_garuda_logo);
+
+  const kabLogoUrl = headerConfig.kab_logo_url || profile.logo_kabupaten_url || DEFAULT_KAB_LOGO_URL;
+  const desaLogoUrl = headerConfig.desa_logo_url || profile.logo_desa_url || '';
+  const garudaLogoUrl = headerConfig.garuda_logo_url || DEFAULT_GARUDA_URL;
+
+  const hasLeftLogo = showKab && Boolean(kabLogoUrl);
+  const hasRightLogo = showDesa && Boolean(desaLogoUrl);
+
   const fontFamily = headerConfig.font_family || 'Times New Roman';
   const borderBottom =
     headerConfig.border_style === 'none'
@@ -412,11 +440,34 @@ export function renderFullLetterHtml(params: {
 </head>
 <body>
   <div class="kop">
-    <h4>${vRegency ? `PEMERINTAH ${vRegency.toUpperCase()}` : 'PEMERINTAH KABUPATEN'}</h4>
-    <h3>${vDistrict ? `KECAMATAN ${vDistrict.toUpperCase()}` : 'KECAMATAN'}</h3>
-    <h2>PEMERINTAH ${vName.toUpperCase()}</h2>
-    <p>${[vAddress, vPhone, vPostal].filter(Boolean).join(' • ')}</p>
-    ${vEmail ? `<p>${vEmail}</p>` : ''}
+    ${showGaruda ? `
+      <div style="text-align: center; margin-bottom: 8px;">
+        <img src="${garudaLogoUrl}" alt="Garuda Pancasila" style="max-height: 65px; max-width: 65px; object-fit: contain;" onerror="this.style.display='none'" />
+      </div>
+    ` : ''}
+    <table style="width: 100%; border-collapse: collapse; margin: 0; padding: 0;">
+      <tr>
+        ${hasLeftLogo ? `
+          <td style="width: 75px; vertical-align: middle; text-align: left; padding-right: 12px;">
+            <img src="${kabLogoUrl}" alt="Lambang Daerah" style="max-height: 75px; max-width: 75px; object-fit: contain;" onerror="this.style.display='none'" />
+          </td>
+        ` : (hasRightLogo ? `<td style="width: 75px;"></td>` : '')}
+
+        <td style="text-align: center; vertical-align: middle;">
+          <h4>${vRegency ? `PEMERINTAH ${vRegency.toUpperCase()}` : 'PEMERINTAH KABUPATEN'}</h4>
+          <h3>${vDistrict ? `KECAMATAN ${vDistrict.toUpperCase()}` : 'KECAMATAN'}</h3>
+          <h2>PEMERINTAH ${vName.toUpperCase()}</h2>
+          <p>${[vAddress, vPhone, vPostal].filter(Boolean).join(' • ')}</p>
+          ${vEmail ? `<p>${vEmail}</p>` : ''}
+        </td>
+
+        ${hasRightLogo ? `
+          <td style="width: 75px; vertical-align: middle; text-align: right; padding-left: 12px;">
+            <img src="${desaLogoUrl}" alt="Lambang Desa" style="max-height: 75px; max-width: 75px; object-fit: contain;" onerror="this.style.display='none'" />
+          </td>
+        ` : (hasLeftLogo ? `<td style="width: 75px;"></td>` : '')}
+      </tr>
+    </table>
   </div>
 
   <div class="title-box">
