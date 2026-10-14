@@ -38,7 +38,7 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter, on
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
-  const [selectedPreviewDoc, setSelectedPreviewDoc] = useState<string | null>(null);
+  const [selectedPreviewDoc, setSelectedPreviewDoc] = useState<{ url: string; name: string } | null>(null);
 
   const handleStartVerification = () => {
     updateLetterStatus(letter.id, 'in_verification');
@@ -149,7 +149,7 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter, on
               {letter.attachments?.map((att, idx) => (
                 <div
                   key={idx}
-                  onClick={() => setSelectedPreviewDoc(att.url)}
+                  onClick={() => setSelectedPreviewDoc({ url: att.url, name: att.name })}
                   className="group cursor-pointer p-2.5 bg-slate-50 hover:bg-emerald-50/50 rounded-xl border border-slate-200/80 hover:border-emerald-300 transition-all flex flex-col items-center text-center"
                 >
                   <div className="w-full h-16 rounded-lg bg-slate-200 overflow-hidden mb-1.5 relative">
@@ -329,18 +329,56 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter, on
         </div>
       </div>
 
-      {/* Preview Image Modal */}
+      {/* Preview Image Modal with higher z-index than parent modal */}
       {selectedPreviewDoc && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md"
+          className="fixed inset-0 z-[10002] flex items-center justify-center p-3 sm:p-6 bg-slate-950/85 backdrop-blur-md animate-fade-in"
           onClick={() => setSelectedPreviewDoc(null)}
         >
-          <div className="max-w-2xl max-h-[85vh] overflow-hidden rounded-2xl bg-white p-2">
-            <img
-              src={selectedPreviewDoc}
-              alt="Pratinjau Berkas"
-              className="max-h-[80vh] w-auto object-contain rounded-xl"
-            />
+          <div 
+            className="max-w-3xl w-full max-h-[90vh] bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-slate-800 flex flex-col animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Toolbar */}
+            <div className="px-5 py-3.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-white shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="font-bold text-sm truncate">
+                  {selectedPreviewDoc.name}
+                </span>
+                <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0">
+                  Lampiran Berkas
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={selectedPreviewDoc.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-all"
+                  title="Buka foto asli resolusi penuh di tab baru browser"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Buka Resolusi Penuh</span>
+                </a>
+                <button
+                  onClick={() => setSelectedPreviewDoc(null)}
+                  className="p-1.5 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-all"
+                  title="Tutup Pratinjau"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Image Viewer Body */}
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-950 min-h-[280px]">
+              <img
+                src={selectedPreviewDoc.url}
+                alt={selectedPreviewDoc.name}
+                className="max-h-[75vh] w-auto max-w-full object-contain rounded-xl shadow-lg select-none"
+              />
+            </div>
           </div>
         </div>
       )}
