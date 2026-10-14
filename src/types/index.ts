@@ -228,3 +228,37 @@ export interface VillageProfile {
   vision: string;
   mission: string[];
 }
+
+export interface LetterTemplateHeaderConfig {
+  show_kab_logo: boolean;
+  show_desa_logo: boolean;
+  kab_logo_url?: string;
+  desa_logo_url?: string;
+  font_family: 'Times New Roman' | 'Bookman Old Style' | 'Arial';
+  line_spacing: number;
+  border_style: 'double' | 'single' | 'none';
+}
+
+export interface LetterTemplateCustomField {
+  key: string;
+  label: string;
+  placeholder?: string;
+  default_value?: string;
+}
+
+export interface LetterTemplate {
+  id?: string;
+  village_code?: string;
+  letter_type_code: string; // e.g. 'SKTM', 'SKU', 'SKCK_PENGANTAR', 'SK_DOMISILI', 'DEFAULT'
+  letter_name: string;
+  title_format: string;
+  header_config: LetterTemplateHeaderConfig;
+  opening_text: string;
+  declaration_text: string;
+  closing_text: string;
+  signer_role: string;
+  custom_fields?: LetterTemplateCustomField[];
+  is_active?: boolean;
+  updated_at?: string;
+}
+

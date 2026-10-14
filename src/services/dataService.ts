@@ -10,7 +10,8 @@ import {
   ComplaintStatus,
   VillageOfficial,
   EmergencyContact,
-  VillageEvent
+  VillageEvent,
+  LetterTemplate
 } from '../types';
 import {
   initialCitizens,
@@ -23,6 +24,7 @@ import {
   initialVillageEvents
 } from '../data/mockData';
 import { supabase } from './supabase';
+import { DEFAULT_TEMPLATES } from '../utils/letterTemplateEngine';
 
 const STORAGE_KEYS = {
   CITIZENS: 'dekati_citizens_v1',
@@ -35,7 +37,8 @@ const STORAGE_KEYS = {
   CURRENT_OFFICIAL: 'dekati_current_official_v1',
   EMERGENCY_CONTACTS: 'dekati_emergency_contacts_v1',
   VILLAGE_EVENTS: 'dekati_village_events_v1',
-  OFFICIALS_LIST: 'dekati_officials_list_v1'
+  OFFICIALS_LIST: 'dekati_officials_list_v1',
+  LETTER_TEMPLATES: 'dekati_letter_templates_v1'
 };
 
 export const defaultOfficials: VillageOfficial[] = [];
@@ -239,6 +242,20 @@ class DataService {
         this.isSupabaseConnected = true;
       }
 
+      // Check letter_templates
+      try {
+        const { data: tmplData, error: tmplErr } = await supabase
+          .from('letter_templates')
+          .select('*')
+          .eq('is_active', true);
+
+        if (!tmplErr && Array.isArray(tmplData) && tmplData.length > 0) {
+          this.setStorage(STORAGE_KEYS.LETTER_TEMPLATES, tmplData);
+        }
+      } catch (tmplFetchErr) {
+        console.warn('[Dekati DataService] Failed to fetch letter_templates from Supabase:', tmplFetchErr);
+      }
+
       this.notify();
     } catch (err) {
       console.warn('[Dekati DataService] Supabase sync fallback to offline local store.', err);
@@ -250,6 +267,24 @@ class DataService {
     try {
       supabase
         .channel('dekati-realtime-channel')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'letter_templates' },
+          (payload) => {
+            const currentTemplates = this.getLetterTemplates();
+            if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+              const updated = payload.new as LetterTemplate;
+              const idx = currentTemplates.findIndex((t) => t.letter_type_code.toUpperCase() === updated.letter_type_code.toUpperCase());
+              if (idx !== -1) {
+                currentTemplates[idx] = updated;
+                this.setStorage(STORAGE_KEYS.LETTER_TEMPLATES, [...currentTemplates]);
+              } else {
+                this.setStorage(STORAGE_KEYS.LETTER_TEMPLATES, [...currentTemplates, updated]);
+              }
+              this.notify();
+            }
+          }
+        )
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'letter_requests' },
@@ -466,6 +501,73 @@ class DataService {
       localStorage.setItem(STORAGE_KEYS.ACTIVE_ROLE, role);
     }
     this.notify();
+  }
+
+  // Letter Templates (Tata Naskah Dinas & Custom Format Surat)
+  getLetterTemplates(): LetterTemplate[] {
+    const defaultList = Object.values(DEFAULT_TEMPLATES);
+    const stored = this.getStorage<LetterTemplate[]>(STORAGE_KEYS.LETTER_TEMPLATES, []);
+    if (!stored || stored.length === 0) {
+      return defaultList;
+    }
+
+    const merged = [...stored];
+    defaultList.forEach((dt) => {
+      if (!merged.some((m) => m.letter_type_code.toUpperCase() === dt.letter_type_code.toUpperCase())) {
+        merged.push(dt);
+      }
+    });
+    return merged;
+  }
+
+  async saveLetterTemplate(template: LetterTemplate): Promise<void> {
+    const current = this.getLetterTemplates();
+    const idx = current.findIndex(
+      (t) => t.letter_type_code.toUpperCase() === template.letter_type_code.toUpperCase()
+    );
+    const updated: LetterTemplate = {
+      ...template,
+      updated_at: new Date().toISOString(),
+    };
+
+    let nextList: LetterTemplate[];
+    if (idx >= 0) {
+      nextList = [...current];
+      nextList[idx] = updated;
+    } else {
+      nextList = [...current, updated];
+    }
+
+    this.setStorage(STORAGE_KEYS.LETTER_TEMPLATES, nextList);
+    this.notify();
+
+    try {
+      const profile = this.getVillageProfile();
+      await supabase.from('letter_templates').upsert(
+        {
+          village_code: profile?.code || '32.04.10.2001',
+          letter_type_code: template.letter_type_code,
+          letter_name: template.letter_name,
+          title_format: template.title_format,
+          header_config: template.header_config,
+          opening_text: template.opening_text,
+          declaration_text: template.declaration_text,
+          closing_text: template.closing_text,
+          signer_role: template.signer_role,
+          custom_fields: template.custom_fields || [],
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'village_code,letter_type_code' }
+      );
+    } catch (err) {
+      console.warn('[DataService] saveLetterTemplate Supabase sync failed, saved locally:', err);
+    }
+  }
+
+  async resetLetterTemplate(letterTypeCode: string): Promise<void> {
+    const defaultTmpl = DEFAULT_TEMPLATES[letterTypeCode.toUpperCase()] || DEFAULT_TEMPLATES.DEFAULT;
+    await this.saveLetterTemplate(defaultTmpl);
   }
 
   // Village Profile

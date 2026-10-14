@@ -11,17 +11,19 @@ import {
   FileCheck2, 
   ShieldCheck, 
   XCircle,
-  Eye
+  Eye,
+  Settings2
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { LetterStatusBadge } from '../components/StatusBadge';
 import { LetterDetailModal } from '../components/LetterDetailModal';
 import { LetterPrintModal } from '../components/LetterPrintModal';
 import { QrVerifyModal } from '../components/QrVerifyModal';
+import { LetterTemplateModal } from '../components/LetterTemplateModal';
 import { LetterRequest, LetterStatus } from '../types';
 
 export const LettersView: React.FC = () => {
-  const { letters, profile } = useData();
+  const { letters, profile, letterTemplates, saveLetterTemplate, resetLetterTemplate } = useData();
   const [activeFilter, setActiveFilter] = useState<'all' | LetterStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
@@ -29,6 +31,7 @@ export const LettersView: React.FC = () => {
   const [selectedLetter, setSelectedLetter] = useState<LetterRequest | null>(null);
   const [printLetter, setPrintLetter] = useState<LetterRequest | null>(null);
   const [qrLetter, setQrLetter] = useState<LetterRequest | null>(null);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
 
   // Filter logic
   const filteredLetters = letters.filter((l) => {
@@ -65,6 +68,13 @@ export const LettersView: React.FC = () => {
             Verifikasi berkas persyaratan permohonan surat warga, penerbitan nomor registrasi desa, dan pengesahan TTE QR Code.
           </p>
         </div>
+        <button
+          onClick={() => setShowTemplateModal(true)}
+          className="flex items-center gap-2 px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-emerald-300 text-slate-700 hover:text-emerald-800 text-xs font-bold rounded-xl shadow-sm transition-all shrink-0"
+        >
+          <Settings2 className="w-4 h-4 text-emerald-600" />
+          <span>Tata Naskah & Template Surat</span>
+        </button>
       </div>
 
       {/* Filter Tabs (Horizontal Pill Bar) */}
@@ -224,6 +234,7 @@ export const LettersView: React.FC = () => {
         <LetterPrintModal
           letter={printLetter}
           profile={profile}
+          templates={letterTemplates}
           onClose={() => setPrintLetter(null)}
         />
       )}
@@ -234,6 +245,15 @@ export const LettersView: React.FC = () => {
           onClose={() => setQrLetter(null)}
         />
       )}
+
+      <LetterTemplateModal
+        isOpen={showTemplateModal}
+        onClose={() => setShowTemplateModal(false)}
+        profile={profile}
+        templates={letterTemplates}
+        onSaveTemplate={saveLetterTemplate}
+        onResetTemplate={resetLetterTemplate}
+      />
     </div>
   );
 };

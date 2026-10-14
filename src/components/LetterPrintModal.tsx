@@ -1,18 +1,50 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, X, Download, ShieldCheck } from 'lucide-react';
-import { LetterRequest, VillageProfile } from '../types';
+import { LetterRequest, LetterTemplate, VillageProfile } from '../types';
+import { 
+  getEffectiveTemplate, 
+  buildTemplateContext, 
+  interpolateTemplateText 
+} from '../utils/letterTemplateEngine';
 
 interface LetterPrintModalProps {
   letter: LetterRequest;
   profile: VillageProfile;
+  templates?: LetterTemplate[];
   onClose: () => void;
 }
 
-export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({ letter, profile, onClose }) => {
+export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({ 
+  letter, 
+  profile, 
+  templates,
+  onClose 
+}) => {
   const handlePrint = () => {
     window.print();
   };
+
+  const effectiveTemplate = getEffectiveTemplate(letter.letter_name, templates);
+  const context = buildTemplateContext(letter, profile, effectiveTemplate.signer_role);
+
+  const headerConfig = effectiveTemplate.header_config || {
+    font_family: 'Times New Roman',
+    line_spacing: 1.5,
+    border_style: 'double',
+  };
+
+  const previewBorderClass =
+    headerConfig.border_style === 'none'
+      ? 'border-b-0 pb-0'
+      : headerConfig.border_style === 'single'
+      ? 'border-b-2 border-slate-900 pb-4'
+      : 'border-b-4 border-double border-slate-900 pb-4';
+
+  const titleText = interpolateTemplateText(effectiveTemplate.title_format, context);
+  const openingText = interpolateTemplateText(effectiveTemplate.opening_text, context);
+  const declarationText = interpolateTemplateText(effectiveTemplate.declaration_text, context);
+  const closingText = interpolateTemplateText(effectiveTemplate.closing_text, context);
 
   if (typeof document === 'undefined') return null;
 
@@ -56,9 +88,20 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({ letter, prof
 
         {/* Scrollable Printable Official Village Letter Area */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-          <div className="printable-area bg-white text-slate-900 font-serif p-6 sm:p-10 border border-slate-200 rounded-xl shadow-sm">
+          <div 
+            className="printable-area bg-white text-slate-900 p-6 sm:p-10 border border-slate-200 rounded-xl shadow-sm"
+            style={{
+              fontFamily:
+                headerConfig.font_family === 'Arial'
+                  ? 'Arial, sans-serif'
+                  : headerConfig.font_family === 'Bookman Old Style'
+                  ? '"Bookman Old Style", Georgia, serif'
+                  : '"Times New Roman", Times, serif',
+              lineHeight: headerConfig.line_spacing || 1.5,
+            }}
+          >
           {/* Official Village Letterhead (KOP SURAT) */}
-          <div className="text-center border-b-4 border-double border-slate-900 pb-4 mb-6 relative">
+          <div className={`text-center mb-6 relative ${previewBorderClass}`}>
             <div className="flex items-center justify-center gap-5">
               <div className="w-16 h-16 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center shrink-0">
                 <span className="text-2xl font-bold font-sans text-emerald-800">DS</span>
@@ -86,21 +129,19 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({ letter, prof
           {/* Letter Title & Number */}
           <div className="text-center my-6">
             <h3 className="text-base font-bold underline uppercase tracking-wide">
-              {letter.letter_name}
+              {titleText || letter.letter_name}
             </h3>
             <p className="text-xs font-sans text-slate-700 mt-1 font-semibold">
-              Nomor: {letter.letter_official_number || letter.tracking_number}
+              Nomor: {context.nomor_surat}
             </p>
           </div>
 
           {/* Letter Content Opening */}
-          <div className="text-xs sm:text-sm leading-relaxed text-justify space-y-4 font-sans text-slate-800">
-            <p>
-              Yang bertanda tangan di bawah ini, Kepala {profile.name || 'Desa'}, {profile.district ? `Kecamatan ${profile.district}, ` : ''}{profile.regency ? `${profile.regency}, ` : ''}menerangkan dengan sebenarnya bahwa:
-            </p>
+          <div className="text-xs sm:text-sm leading-relaxed text-justify space-y-4 text-slate-800">
+            <p>{openingText}</p>
 
             {/* Citizen Data Table */}
-            <div className="pl-6 sm:pl-10 space-y-1.5 py-2">
+            <div className="pl-6 sm:pl-10 space-y-1.5 py-2 font-sans">
               <div className="grid grid-cols-12 text-xs">
                 <span className="col-span-4 text-slate-600">Nama Lengkap</span>
                 <span className="col-span-1">:</span>
@@ -123,13 +164,9 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({ letter, prof
               </div>
             </div>
 
-            <p>
-              Adalah benar-benar warga yang bertempat tinggal secara sah di wilayah {profile.name || 'Desa'} dan tercatat dalam data kependudukan resmi desa. Sepanjang sepengetahuan kami, yang bersangkutan memiliki catatan permohonan sesuai dengan maksud dan tujuan di atas.
-            </p>
+            <p>{declarationText}</p>
 
-            <p>
-              Demikian surat keterangan ini dibuat dengan sebenarnya agar dapat dipergunakan sebagaimana mestinya oleh yang berkepentingan.
-            </p>
+            <p>{closingText}</p>
           </div>
 
           {/* Signature & TTE QR Section */}
