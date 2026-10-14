@@ -23,8 +23,10 @@ import {
   Regency,
   District,
   Village,
-  toTitleCase
+  toTitleCase,
+  detectVillageType
 } from '../services/wilayahService';
+import { VillageType } from '../types';
 
 interface VillageProfileModalProps {
   isOpen: boolean;
@@ -37,6 +39,9 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
   // Local form states
   const [name, setName] = useState(profile.name || '');
   const [code, setCode] = useState(profile.code || '');
+  const [villageType, setVillageType] = useState<VillageType>(
+    profile.village_type || (profile.name?.toLowerCase().includes('kelurahan') ? 'kelurahan' : 'desa')
+  );
   const [district, setDistrict] = useState(profile.district || '');
   const [regency, setRegency] = useState(profile.regency || '');
   const [province, setProvince] = useState(profile.province || '');
@@ -45,6 +50,7 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
   const [officePhone, setOfficePhone] = useState(profile.office_phone || '');
   const [officeEmail, setOfficeEmail] = useState(profile.office_email || '');
   const [kadesName, setKadesName] = useState(profile.kades_name || '');
+  const [kadesNip, setKadesNip] = useState(profile.kades_nip || '');
   const [sekdesName, setSekdesName] = useState(profile.sekdes_name || '');
   const [vision, setVision] = useState(profile.vision || '');
   const [mission, setMission] = useState<string[]>(
@@ -73,6 +79,9 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
     if (isOpen) {
       setName(profile.name || '');
       setCode(profile.code || '');
+      setVillageType(
+        profile.village_type || (profile.name?.toLowerCase().includes('kelurahan') ? 'kelurahan' : 'desa')
+      );
       setDistrict(profile.district || '');
       setRegency(profile.regency || '');
       setProvince(profile.province || '');
@@ -81,6 +90,7 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
       setOfficePhone(profile.office_phone || '');
       setOfficeEmail(profile.office_email || '');
       setKadesName(profile.kades_name || '');
+      setKadesNip(profile.kades_nip || '');
       setSekdesName(profile.sekdes_name || '');
       setVision(profile.vision || '');
       setMission(profile.mission && profile.mission.length > 0 ? [...profile.mission] : ['']);
@@ -162,14 +172,31 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
     }
   };
 
-  // Handle Village change
+  // Handle Village change with automatic Desa / Kelurahan detection
   const handleVillageChange = (vilId: string) => {
     setSelectedVillageId(vilId);
     const vilObj = villages.find((v) => v.id === vilId);
     if (vilObj) {
-      const vName = toTitleCase(vilObj.name);
-      setName(`Desa ${vName}`);
+      const detection = detectVillageType({
+        villageCode: vilObj.id,
+        villageName: vilObj.name,
+        regencyName: regency,
+        districtName: district,
+      });
+
+      setName(detection.fullName);
       setCode(vilObj.id);
+      setVillageType(detection.type);
+    }
+  };
+
+  // Manual Toggle Desa / Kelurahan
+  const handleToggleVillageType = (type: VillageType) => {
+    setVillageType(type);
+    const clean = name.replace(/^(Pemerintah\s+)?(Desa|Kelurahan)\s+/i, '').trim();
+    if (clean) {
+      const prefix = type === 'kelurahan' ? 'Kelurahan' : 'Desa';
+      setName(`${prefix} ${clean}`);
     }
   };
 
@@ -197,6 +224,7 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
       await updateVillageProfile({
         name,
         code,
+        village_type: villageType,
         district,
         regency,
         province,
@@ -205,6 +233,7 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
         office_phone: officePhone,
         office_email: officeEmail,
         kades_name: kadesName,
+        kades_nip: kadesNip,
         sekdes_name: sekdesName,
         vision,
         mission: mission.filter((m) => m.trim().length > 0)
@@ -355,22 +384,52 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
             )}
           </div>
 
-          {/* B. Identitas Utama Desa */}
+          {/* B. Identitas Utama & Klasifikasi Desa/Kelurahan */}
           <div className="space-y-3">
-            <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5 pb-2 border-b border-slate-100">
-              <Building2 className="w-4 h-4 text-emerald-600" />
-              <span>Identitas & Kode Wilayah</span>
-            </h4>
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-2">
+              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-emerald-600" />
+                <span>Identitas & Klasifikasi Wilayah</span>
+              </h4>
+
+              {/* Toggle Desa vs Kelurahan */}
+              <div className="inline-flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => handleToggleVillageType('desa')}
+                  className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                    villageType === 'desa'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  🏛️ Desa
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleVillageType('kelurahan')}
+                  className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                    villageType === 'kelurahan'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  🏢 Kelurahan
+                </button>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="font-bold text-slate-700 block">Nama Desa / Kelurahan:</label>
+                <label className="font-bold text-slate-700 block">
+                  {villageType === 'kelurahan' ? 'Nama Kelurahan:' : 'Nama Desa:'}
+                </label>
                 <input
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Contoh: Desa Sukamaju / Kelurahan Sukamaju"
+                  placeholder={villageType === 'kelurahan' ? 'Contoh: Kelurahan Sukamaju' : 'Contoh: Desa Sukamaju'}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 font-semibold focus:outline-none focus:border-emerald-500"
                 />
               </div>
@@ -382,7 +441,7 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   placeholder="Contoh: 32.01.01.2005"
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 font-semibold focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 font-semibold focus:outline-none focus:border-emerald-500 font-mono"
                 />
               </div>
 
@@ -436,34 +495,67 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
           <div className="space-y-3">
             <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5 pb-2 border-b border-slate-100">
               <UserCheck className="w-4 h-4 text-emerald-600" />
-              <span>Pimpinan & Kontak Balai Desa</span>
+              <span>
+                {villageType === 'kelurahan'
+                  ? 'Pimpinan & Kontak Kantor Kelurahan'
+                  : 'Pimpinan & Kontak Balai Desa'}
+              </span>
             </h4>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="font-bold text-slate-700 block">Nama Kepala Desa / Lurah:</label>
+                <label className="font-bold text-slate-700 block">
+                  {villageType === 'kelurahan' ? 'Nama Lurah:' : 'Nama Kepala Desa (Kades):'}
+                </label>
                 <input
                   type="text"
                   value={kadesName}
                   onChange={(e) => setKadesName(e.target.value)}
-                  placeholder="Nama Lengkap & Gelar Kades/Lurah"
+                  placeholder={
+                    villageType === 'kelurahan'
+                      ? 'Nama Lengkap & Gelar Lurah'
+                      : 'Nama Lengkap & Gelar Kepala Desa'
+                  }
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 font-semibold focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="font-bold text-slate-700 block">Nama Sekretaris Desa (Sekdes):</label>
+                <label className="font-bold text-slate-700 block">
+                  {villageType === 'kelurahan' ? 'NIP Lurah (PNS/ASN):' : 'NIP / NRPDes (Opsional):'}
+                </label>
+                <input
+                  type="text"
+                  value={kadesNip}
+                  onChange={(e) => setKadesNip(e.target.value)}
+                  placeholder="Contoh: 19780512 200312 1 002"
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 font-semibold focus:outline-none focus:border-emerald-500 font-mono text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 block">
+                  {villageType === 'kelurahan'
+                    ? 'Nama Sekretaris Kelurahan (Seklur):'
+                    : 'Nama Sekretaris Desa (Sekdes/Carik):'}
+                </label>
                 <input
                   type="text"
                   value={sekdesName}
                   onChange={(e) => setSekdesName(e.target.value)}
-                  placeholder="Nama Lengkap & Gelar Sekdes/Carik"
+                  placeholder={
+                    villageType === 'kelurahan'
+                      ? 'Nama Lengkap & Gelar Seklur'
+                      : 'Nama Lengkap & Gelar Sekdes/Carik'
+                  }
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 font-semibold focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="font-bold text-slate-700 block">Telepon Kantor Balai Desa:</label>
+                <label className="font-bold text-slate-700 block">
+                  {villageType === 'kelurahan' ? 'Telepon Kantor Kelurahan:' : 'Telepon Kantor Balai Desa:'}
+                </label>
                 <input
                   type="text"
                   value={officePhone}
@@ -474,23 +566,27 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
               </div>
 
               <div className="space-y-1">
-                <label className="font-bold text-slate-700 block">Email Resmi Desa:</label>
+                <label className="font-bold text-slate-700 block">
+                  {villageType === 'kelurahan' ? 'Email Resmi Kelurahan:' : 'Email Resmi Desa:'}
+                </label>
                 <input
                   type="email"
                   value={officeEmail}
                   onChange={(e) => setOfficeEmail(e.target.value)}
-                  placeholder="Contoh: sekretariat@desa.id"
+                  placeholder={villageType === 'kelurahan' ? 'sekretariat@kelurahan.go.id' : 'sekretariat@desa.id'}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 font-semibold focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
-              <div className="sm:col-span-2 space-y-1">
-                <label className="font-bold text-slate-700 block">Alamat Kantor / Balai Desa:</label>
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700 block">
+                  {villageType === 'kelurahan' ? 'Alamat Kantor Kelurahan:' : 'Alamat Balai Desa:'}
+                </label>
                 <input
                   type="text"
                   value={officeAddress}
                   onChange={(e) => setOfficeAddress(e.target.value)}
-                  placeholder="Jl. Raya Desa No. ..."
+                  placeholder="Jl. Raya No. ..."
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 font-semibold focus:outline-none focus:border-emerald-500"
                 />
               </div>

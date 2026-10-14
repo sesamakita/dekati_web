@@ -34,6 +34,98 @@ export function toTitleCase(str: string): string {
     .join(' ');
 }
 
+export type VillageType = 'desa' | 'kelurahan';
+
+export interface VillageTypeDetectionResult {
+  type: VillageType;
+  prefix: 'Desa' | 'Kelurahan';
+  leaderRole: 'kades' | 'lurah';
+  leaderTitle: 'Kepala Desa' | 'Lurah';
+  secretaryTitle: 'Sekretaris Desa' | 'Sekretaris Kelurahan';
+  institutionName: string;
+  cleanName: string;
+  fullName: string;
+}
+
+/**
+ * Deteksi otomatis apakah data wilayah Kemendagri bertipe DESA atau KELURAHAN
+ * Berdasarkan standar Kemendagri (digit 1 vs 2), hierarki Kota vs Kabupaten, dan nomenklatur nama.
+ */
+export function detectVillageType(params: {
+  villageCode?: string;
+  villageName?: string;
+  regencyName?: string;
+  districtName?: string;
+}): VillageTypeDetectionResult {
+  const { villageCode = '', villageName = '', regencyName = '' } = params;
+  const upperName = villageName.toUpperCase().trim();
+  const upperReg = regencyName.toUpperCase().trim();
+
+  const cleanName = upperName
+    .replace(/^(PEMERINTAH\s+)?(KELURAHAN|DESA|KAMPUNG|GAMPONG|NAGARI)\s+/i, '')
+    .trim();
+
+  // 1. Cek dari nama eksplisit
+  if (upperName.startsWith('KELURAHAN ') || upperName.includes('KELURAHAN')) {
+    return {
+      type: 'kelurahan',
+      prefix: 'Kelurahan',
+      leaderRole: 'lurah',
+      leaderTitle: 'Lurah',
+      secretaryTitle: 'Sekretaris Kelurahan',
+      institutionName: `Pemerintah Kelurahan ${toTitleCase(cleanName)}`,
+      cleanName: toTitleCase(cleanName),
+      fullName: `Kelurahan ${toTitleCase(cleanName)}`,
+    };
+  }
+
+  if (upperName.startsWith('DESA ') || upperName.includes('DESA')) {
+    return {
+      type: 'desa',
+      prefix: 'Desa',
+      leaderRole: 'kades',
+      leaderTitle: 'Kepala Desa',
+      secretaryTitle: 'Sekretaris Desa',
+      institutionName: `Pemerintah Desa ${toTitleCase(cleanName)}`,
+      cleanName: toTitleCase(cleanName),
+      fullName: `Desa ${toTitleCase(cleanName)}`,
+    };
+  }
+
+  // 2. Cek apakah berada di wilayah Kota Otonom (KOTA ...) atau DKI Jakarta
+  const isCity =
+    upperReg.startsWith('KOTA ') ||
+    upperReg.startsWith('KODYA ') ||
+    villageCode.startsWith('31') ||
+    upperReg.includes('KOTA');
+
+  // 3. Cek standar digit Kemendagri (1XXX = Kelurahan, 2XXX = Desa)
+  let isKelurahanByCode = false;
+  const parts = villageCode.split('.');
+  if (parts.length >= 4) {
+    const vilPart = parts[3];
+    if (vilPart.startsWith('1')) isKelurahanByCode = true;
+    else if (vilPart.startsWith('2')) isKelurahanByCode = false;
+  } else if (villageCode.length >= 10) {
+    const digit7 = villageCode.charAt(6);
+    if (digit7 === '1') isKelurahanByCode = true;
+  }
+
+  const isKelurahan = isKelurahanByCode || isCity;
+  const type: VillageType = isKelurahan ? 'kelurahan' : 'desa';
+
+  return {
+    type,
+    prefix: type === 'kelurahan' ? 'Kelurahan' : 'Desa',
+    leaderRole: type === 'kelurahan' ? 'lurah' : 'kades',
+    leaderTitle: type === 'kelurahan' ? 'Lurah' : 'Kepala Desa',
+    secretaryTitle: type === 'kelurahan' ? 'Sekretaris Kelurahan' : 'Sekretaris Desa',
+    institutionName: `Pemerintah ${type === 'kelurahan' ? 'Kelurahan' : 'Desa'} ${toTitleCase(cleanName)}`,
+    cleanName: toTitleCase(cleanName),
+    fullName: `${type === 'kelurahan' ? 'Kelurahan' : 'Desa'} ${toTitleCase(cleanName)}`,
+  };
+}
+
 // 34 Provinsi Resmi Indonesia (Kemendagri / BPS) sebagai data awal & fallback terjamin
 export const ALL_INDONESIA_PROVINCES: Province[] = [
   { id: '11', name: 'ACEH' },

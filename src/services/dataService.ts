@@ -1412,9 +1412,16 @@ class DataService {
         }
 
         if (user.village_name && user.village_name !== 'Pemerintah Desa') {
+          const userVilType =
+            user.village_type ||
+            (user.role === 'lurah' || user.village_name.toLowerCase().includes('kelurahan')
+              ? 'kelurahan'
+              : 'desa');
+
           this.updateVillageProfile({
             name: user.village_name,
             code: user.village_code || '',
+            village_type: userVilType,
             ...(user.role === 'kades' || user.role === 'lurah' ? { kades_name: user.nama_lengkap } : {})
           });
         }
@@ -1436,12 +1443,18 @@ class DataService {
     nik: string;
     village_code?: string;
     village_name?: string;
+    village_type?: 'desa' | 'kelurahan';
     district?: string;
     regency?: string;
     province?: string;
     phone?: string;
   }): Promise<{ success: boolean; user?: VillageOfficial; error?: string }> {
     const cleanEmail = payload.email.trim().toLowerCase();
+    const effectiveVillageType: 'desa' | 'kelurahan' =
+      payload.village_type ||
+      (payload.role === 'lurah' || (payload.village_name && payload.village_name.toLowerCase().includes('kelurahan'))
+        ? 'kelurahan'
+        : 'desa');
 
     try {
       // 1. Coba panggil fungsi RPC register_official di Supabase
@@ -1466,6 +1479,7 @@ class DataService {
           can_sign_tte: payload.role === 'kades' || payload.role === 'lurah',
           village_name: data[0].village_name,
           village_code: payload.village_code || '',
+          village_type: effectiveVillageType,
           status: 'active'
         };
 
@@ -1479,6 +1493,7 @@ class DataService {
           this.updateVillageProfile({
             name: payload.village_name || 'Pemerintah Desa',
             code: payload.village_code || '',
+            village_type: effectiveVillageType,
             district: payload.district || '',
             regency: payload.regency || '',
             province: payload.province || '',
@@ -1506,6 +1521,7 @@ class DataService {
       can_sign_tte: payload.role === 'kades' || payload.role === 'lurah',
       village_name: payload.village_name || 'Pemerintah Desa',
       village_code: payload.village_code || '',
+      village_type: effectiveVillageType,
       status: 'active'
     };
 
@@ -1517,6 +1533,7 @@ class DataService {
       this.updateVillageProfile({
         name: payload.village_name || 'Pemerintah Desa',
         code: payload.village_code || '',
+        village_type: effectiveVillageType,
         district: payload.district || '',
         regency: payload.regency || '',
         province: payload.province || '',

@@ -4,6 +4,8 @@ export type UserRole = 'superadmin' | 'kades' | 'lurah' | 'admin_desa' | 'sekdes
 
 export type UserStatus = 'pending_verification' | 'active' | 'rejected' | 'suspended';
 
+export type VillageType = 'desa' | 'kelurahan';
+
 export interface VillageOfficial {
   id: string;
   user_id?: string;
@@ -15,6 +17,7 @@ export interface VillageOfficial {
   village_id?: number;
   village_code: string;
   village_name: string;
+  village_type?: VillageType;
   phone_number?: string;
   avatar_url?: string;
   can_sign_tte: boolean;
@@ -216,6 +219,7 @@ export interface ApbdesData {
 export interface VillageProfile {
   name: string;
   code: string;
+  village_type?: VillageType;
   district: string;
   regency: string;
   province: string;
@@ -224,6 +228,7 @@ export interface VillageProfile {
   office_phone: string;
   office_email: string;
   kades_name: string;
+  kades_nip?: string;
   sekdes_name: string;
   vision: string;
   mission: string[];

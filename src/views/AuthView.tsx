@@ -22,7 +22,16 @@ import {
   MapPin
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
-import { wilayahService, Province, Regency, District, Village, toTitleCase } from '../services/wilayahService';
+import { VillageType } from '../types';
+import { 
+  wilayahService, 
+  Province, 
+  Regency, 
+  District, 
+  Village, 
+  toTitleCase,
+  detectVillageType 
+} from '../services/wilayahService';
 import { CustomDialog } from '../components/CustomDialog';
 
 interface AuthViewProps {
@@ -50,8 +59,13 @@ export const AuthView: React.FC<AuthViewProps> = ({
   const [showForgotPasswordDialog, setShowForgotPasswordDialog] = useState(false);
 
   // Register Form States
+  const [regVillageType, setRegVillageType] = useState<VillageType>(
+    profile.village_type || (profile.name?.toLowerCase().includes('kelurahan') ? 'kelurahan' : 'desa')
+  );
   const [regName, setRegName] = useState('');
-  const [regRole, setRegRole] = useState('kades');
+  const [regRole, setRegRole] = useState(
+    profile.village_type === 'kelurahan' || profile.name?.toLowerCase().includes('kelurahan') ? 'lurah' : 'kades'
+  );
   const [regNik, setRegNik] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regVillage, setRegVillage] = useState(profile.name && profile.name !== 'Pemerintah Desa' ? profile.name : '');
@@ -148,9 +162,33 @@ export const AuthView: React.FC<AuthViewProps> = ({
     setSelVilId(vilId);
     const v = villages.find((item) => item.id === vilId);
     if (v) {
-      const prefix = regRole === 'lurah' ? 'Kelurahan' : 'Desa';
-      setRegVillage(`${prefix} ${toTitleCase(v.name)}`);
+      const detection = detectVillageType({
+        villageCode: v.id,
+        villageName: v.name,
+        regencyName: regRegency,
+        districtName: regDistrict,
+      });
+
+      setRegVillageType(detection.type);
+      setRegVillage(detection.fullName);
       setRegVillageCode(v.id);
+
+      // Otomatis sinkronkan peran pimpinan jika pengguna memilih kades/lurah
+      if (regRole === 'kades' || regRole === 'lurah') {
+        setRegRole(detection.leaderRole);
+      }
+    }
+  };
+
+  const handleToggleVillageType = (type: VillageType) => {
+    setRegVillageType(type);
+    const clean = regVillage.replace(/^(Pemerintah\s+)?(Desa|Kelurahan)\s+/i, '').trim();
+    if (clean) {
+      const prefix = type === 'kelurahan' ? 'Kelurahan' : 'Desa';
+      setRegVillage(`${prefix} ${clean}`);
+    }
+    if (regRole === 'kades' || regRole === 'lurah') {
+      setRegRole(type === 'kelurahan' ? 'lurah' : 'kades');
     }
   };
 
@@ -214,6 +252,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
         nik: regNik,
         village_code: regVillageCode,
         village_name: regVillage,
+        village_type: regVillageType,
         district: regDistrict,
         regency: regRegency,
         province: regProvince,
@@ -544,11 +583,21 @@ export const AuthView: React.FC<AuthViewProps> = ({
                       onChange={(e) => setRegRole(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-emerald-500"
                     >
-                      <option value="kades">Kepala Desa / Lurah (Otoritas TTE)</option>
-                      <option value="sekdes">Sekretaris Desa (Carik)</option>
+                      {regVillageType === 'kelurahan' ? (
+                        <option value="lurah">Lurah (Kepala Kelurahan - Otoritas TTE)</option>
+                      ) : (
+                        <option value="kades">Kepala Desa (Kades - Otoritas TTE)</option>
+                      )}
+                      <option value="sekdes">
+                        {regVillageType === 'kelurahan' ? 'Sekretaris Kelurahan (Seklur)' : 'Sekretaris Desa (Sekdes/Carik)'}
+                      </option>
                       <option value="kasi_layanan">Kasi Pelayanan (Verifikator Surat)</option>
-                      <option value="kaur_pembangunan">Kaur Pembangunan (Penanganan Aduan)</option>
-                      <option value="kaur_keuangan">Kaur Keuangan (Bendahara APBDes)</option>
+                      <option value="kaur_pembangunan">
+                        {regVillageType === 'kelurahan' ? 'Seksi Ketenteraman / Pembangunan' : 'Kaur Pembangunan (Penanganan Aduan)'}
+                      </option>
+                      <option value="kaur_keuangan">
+                        {regVillageType === 'kelurahan' ? 'Bendahara Pengeluaran Pembantu' : 'Kaur Keuangan (Bendahara APBDes)'}
+                      </option>
                       <option value="satlinmas">Satlinmas & Ketenteraman</option>
                     </select>
                   </div>
@@ -710,26 +759,67 @@ export const AuthView: React.FC<AuthViewProps> = ({
                     )}
                   </div>
 
-                  {/* Kartu Ringkasan Wilayah Terpilih */}
+                  {/* Kartu Ringkasan Wilayah Terpilih & Klasifikasi Desa/Kelurahan */}
                   {regVillage && (
-                    <div className="bg-emerald-50/90 border border-emerald-300 rounded-xl p-3 flex items-start gap-2.5 animate-fade-in">
-                      <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
-                        <MapPin className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="font-bold text-emerald-950 text-xs truncate">
-                            {regVillage}
-                          </p>
-                          {regVillageCode && (
-                            <span className="text-[10px] font-mono bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-md font-semibold shrink-0">
-                              Kode: {regVillageCode}
-                            </span>
-                          )}
+                    <div className="bg-emerald-50/90 border border-emerald-300 rounded-xl p-3 space-y-2.5 animate-fade-in">
+                      <div className="flex items-start gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                          <MapPin className="w-4 h-4" />
                         </div>
-                        <p className="text-[11px] text-emerald-800 font-medium mt-0.5">
-                          {[regDistrict, regRegency, regProvince].filter(Boolean).join(' • ') || 'Wilayah kedaerahan'}
-                        </p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-bold text-emerald-950 text-xs truncate">
+                              {regVillage}
+                            </p>
+                            {regVillageCode && (
+                              <span className="text-[10px] font-mono bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-md font-semibold shrink-0">
+                                Kode: {regVillageCode}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-emerald-800 font-medium mt-0.5">
+                            {[regDistrict, regRegency, regProvince].filter(Boolean).join(' • ') || 'Wilayah kedaerahan'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Klasifikasi Wilayah & Toggle Manual */}
+                      <div className="pt-2 border-t border-emerald-200/80 flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-emerald-900">Klasifikasi Wilayah:</span>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                            regVillageType === 'kelurahan'
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                              : 'bg-emerald-200/80 text-emerald-900 border border-emerald-400'
+                          }`}>
+                            {regVillageType === 'kelurahan' ? '🏢 Kelurahan (PNS/ASN)' : '🏛️ Desa (Otonom)'}
+                          </span>
+                        </div>
+
+                        <div className="inline-flex bg-white/90 p-0.5 rounded-lg border border-emerald-300 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleVillageType('desa')}
+                            className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all ${
+                              regVillageType === 'desa'
+                                ? 'bg-emerald-700 text-white shadow-xs'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            Desa
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleVillageType('kelurahan')}
+                            className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all ${
+                              regVillageType === 'kelurahan'
+                                ? 'bg-emerald-700 text-white shadow-xs'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            Kelurahan
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}

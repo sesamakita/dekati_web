@@ -32,11 +32,18 @@ CREATE TABLE IF NOT EXISTS public.letter_templates (
     UNIQUE(village_code, letter_type_code)
 );
 
--- Penambahan Kolom Logo pada Profil Desa (jika tabel village_profiles ada)
+-- Penambahan Kolom Logo & Klasifikasi Wilayah pada Profil Desa / Kelurahan
 ALTER TABLE IF EXISTS public.village_profiles 
 ADD COLUMN IF NOT EXISTS logo_kabupaten_url TEXT,
 ADD COLUMN IF NOT EXISTS logo_desa_url TEXT,
-ADD COLUMN IF NOT EXISTS logo_provinsi_url TEXT;
+ADD COLUMN IF NOT EXISTS logo_provinsi_url TEXT,
+ADD COLUMN IF NOT EXISTS village_type VARCHAR(20) DEFAULT 'desa',
+ADD COLUMN IF NOT EXISTS kades_nip VARCHAR(50);
+
+-- Penambahan Kolom Klasifikasi Wilayah pada Akun Aparat / Pamong
+ALTER TABLE IF EXISTS public.village_officials
+ADD COLUMN IF NOT EXISTS village_type VARCHAR(20) DEFAULT 'desa',
+ADD COLUMN IF NOT EXISTS nip VARCHAR(50);
 
 -- Indexing
 CREATE INDEX IF NOT EXISTS idx_letter_templates_village ON public.letter_templates(village_code);
