@@ -1,7 +1,7 @@
-// src/views/landing/LandingFooter.tsx
 import React from 'react';
-import { Building2, ShieldCheck, Smartphone } from 'lucide-react';
+import { ShieldCheck, Smartphone } from 'lucide-react';
 import { VillageProfile } from '../../types';
+import { DekatiLogo } from '../../components/DekatiLogo';
 
 interface LandingFooterProps {
   profile: VillageProfile;
@@ -20,13 +20,10 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Col 1 */}
           <div className="space-y-3 md:col-span-2">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white">
-                <Building2 className="w-4 h-4" />
-              </div>
-              <span className="text-base font-extrabold text-slate-900">Dekati</span>
-              <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                Desa Kita Dekat di Hati
+            <div className="flex items-center gap-3 flex-wrap">
+              <DekatiLogo variant="brand" className="h-7 w-auto" />
+              <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                Desa &amp; Kelurahan semakin dekat di hati warga
               </span>
             </div>
             <p className="text-xs text-slate-500 max-w-sm leading-relaxed">

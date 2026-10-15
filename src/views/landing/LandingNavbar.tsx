@@ -30,15 +30,12 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
               className="h-9 sm:h-10 w-auto transition-transform duration-300 group-hover:scale-[1.03]"
             />
           </div>
-          <div className="hidden sm:flex flex-col border-l border-slate-200/90 pl-3 py-0.5 select-none">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 leading-none">
-                Digital Desa
-              </span>
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            </div>
-            <span className="text-[10px] font-semibold text-slate-700 tracking-tight leading-none mt-1">
-              Layanan Warga & Pemerintahan
+          <div className="hidden sm:flex flex-col border-l border-slate-200/90 pl-3.5 py-0.5 select-none justify-center">
+            <span className="text-[11px] font-bold text-slate-800 tracking-tight leading-none">
+              Desa &amp; Kelurahan
+            </span>
+            <span className="text-[10.5px] font-medium text-emerald-700 tracking-tight leading-none mt-1">
+              semakin dekat di hati warga
             </span>
           </div>
         </a>
