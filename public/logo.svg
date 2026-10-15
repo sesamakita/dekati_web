@@ -1,5 +1,55 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
-  <rect width="100" height="100" rx="24" fill="#059669" />
-  <path d="M50 20L20 44V80H40V60H60V80H80V44L50 20Z" fill="white" />
-  <circle cx="50" cy="40" r="7" fill="#34D399" />
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="emeraldBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="45%" stop-color="#047857" />
+      <stop offset="100%" stop-color="#064E3B" />
+    </linearGradient>
+
+    <!-- Glowing Mint / Emerald Heart Gradient -->
+    <linearGradient id="mintHeart" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6EE7B7" />
+      <stop offset="50%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+
+    <linearGradient id="brightSprout" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A7F3D0" />
+      <stop offset="100%" stop-color="#34D399" />
+    </linearGradient>
+
+    <filter id="shadowD" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#022C22" flood-opacity="0.45" />
+    </filter>
+
+    <filter id="glowDot" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="228" fill="url(#emeraldBg)" />
+  <circle cx="512" cy="512" r="320" fill="#10B981" opacity="0.25" filter="blur(50px)" />
+
+  <g transform="translate(253.904, 155.60399999999996) scale(0.8)" filter="url(#shadowD)">
+    <path d="M645.24,386.85 C645.24,507.29 605.94,610.44 527.35,696.49 C448.57,782.35 348.37,825.37 226.75,825.37 C169.18,825.37 93.74,823.02 0.02,818.5 C7.68,765.84 23.6,635.19 47.76,426.54 C62.3,286.85 70.56,167.59 72.52,68.96 L173.9,68.96 C189.62,68.96 213,68.57 243.84,67.39 C274.69,66.21 298.66,65.62 315.36,65.62 C425.19,65.62 507.7,96.07 562.72,156.78 C617.73,217.69 645.24,294.31 645.24,386.85 Z M493.95,404.73 C493.95,339.11 475.68,285.28 439.53,243.43 C403.18,201.58 348.37,180.75 274.69,180.75 C256.22,180.75 233.82,182.52 207.3,185.86 C204.94,221.22 197.87,301.39 185.88,426.54 C176.45,518.29 168.4,609.26 161.72,699.44 C185.1,704.35 209.46,706.9 234.81,706.9 C315.75,706.9 379.21,677.04 425.19,617.31 C470.97,557.59 493.95,486.85 493.95,404.73 Z" fill="#FFFFFF" fill-rule="evenodd" />
+    <path d="
+M 326,345 
+C 305,290 240,265 195,310 
+C 150,355 145,435 190,505 
+C 230,570 285,630 322,658 
+C 325,660 331,660 334,658 
+C 370,630 435,565 470,498 
+C 510,425 500,345 450,300 
+C 400,258 348,290 326,345 Z
+" fill="url(#mintHeart)" />
+    <path d="
+M 432,298
+C 460,250 505,225 545,220
+C 538,255 510,290 470,308
+C 452,315 438,308 432,298 Z
+" fill="url(#brightSprout)" />
+    <circle cx="620" cy="115" r="44" fill="#FDE047" filter="url(#glowDot)" />
+  </g>
 </svg>
