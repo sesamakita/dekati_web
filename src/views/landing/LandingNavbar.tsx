@@ -1,6 +1,6 @@
-// src/views/landing/LandingNavbar.tsx
 import React from 'react';
-import { Building2, Smartphone, ShieldCheck, Search } from 'lucide-react';
+import { Smartphone, ShieldCheck, Search } from 'lucide-react';
+import { DekatiLogo } from '../../components/DekatiLogo';
 
 interface LandingNavbarProps {
   onEnterAdmin: () => void;
@@ -15,14 +15,33 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
     <nav className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
         {/* Logo & Portal Identity */}
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-md shadow-emerald-600/25 shrink-0">
-            <Building2 className="w-6 h-6" />
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className="flex items-center gap-3.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-xl py-1 transition-transform"
+          title="Portal Layanan Desa & Kelurahan Dekati"
+        >
+          <div className="flex items-center">
+            <DekatiLogo
+              variant="brand"
+              className="h-9 sm:h-10 w-auto transition-transform duration-300 group-hover:scale-[1.03]"
+            />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-extrabold text-slate-900 tracking-tight">Dekati</span>
+          <div className="hidden sm:flex flex-col border-l border-slate-200/90 pl-3 py-0.5 select-none">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 leading-none">
+                Digital Desa
+              </span>
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+            <span className="text-[10px] font-semibold text-slate-700 tracking-tight leading-none mt-1">
+              Layanan Warga & Pemerintahan
+            </span>
           </div>
-        </div>
+        </a>
 
         {/* Navigation Links (Desktop) */}
         <div className="hidden lg:flex items-center gap-6 text-sm font-semibold text-slate-600">
