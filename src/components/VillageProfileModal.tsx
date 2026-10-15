@@ -1,5 +1,5 @@
 // src/components/VillageProfileModal.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X,
@@ -14,9 +14,15 @@ import {
   ListPlus,
   Trash2,
   Search,
-  ChevronDown
+  ChevronDown,
+  Upload,
+  Image,
+  RotateCcw,
+  Sparkles,
+  ShieldCheck
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
+import { DEFAULT_DESA_LOGO_DATA_URI, DEFAULT_KAB_LOGO_DATA_URI } from '../utils/letterTemplateEngine';
 import {
   wilayahService,
   Province,
@@ -56,6 +62,43 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
   const [mission, setMission] = useState<string[]>(
     profile.mission && profile.mission.length > 0 ? [...profile.mission] : ['']
   );
+  const [logoDesaUrl, setLogoDesaUrl] = useState(profile.logo_desa_url || '');
+  const [logoKabupatenUrl, setLogoKabupatenUrl] = useState(profile.logo_kabupaten_url || '');
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const desaFileInputRef = useRef<HTMLInputElement>(null);
+  const kabFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'desa' | 'kabupaten') => {
+    setUploadError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Mohon pilih berkas gambar yang sah (PNG, JPG, SVG, WebP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('Ukuran berkas gambar maksimal 5 MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      if (target === 'desa') {
+        setLogoDesaUrl(base64);
+      } else {
+        setLogoKabupatenUrl(base64);
+      }
+    };
+    reader.onerror = () => {
+      setUploadError('Gagal membaca berkas gambar.');
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -94,9 +137,12 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
       setSekdesName(profile.sekdes_name || '');
       setVision(profile.vision || '');
       setMission(profile.mission && profile.mission.length > 0 ? [...profile.mission] : ['']);
+      setLogoDesaUrl(profile.logo_desa_url || '');
+      setLogoKabupatenUrl(profile.logo_kabupaten_url || '');
+      setUploadError(null);
       setSaveSuccess(false);
     }
-  }, [isOpen]);
+  }, [isOpen, profile]);
 
   // Load provinces on picker active
   useEffect(() => {
@@ -236,7 +282,9 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
         kades_nip: kadesNip,
         sekdes_name: sekdesName,
         vision,
-        mission: mission.filter((m) => m.trim().length > 0)
+        mission: mission.filter((m) => m.trim().length > 0),
+        logo_desa_url: logoDesaUrl,
+        logo_kabupaten_url: logoKabupatenUrl,
       });
 
       setSaveSuccess(true);
@@ -491,7 +539,184 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
             </div>
           </div>
 
-          {/* C. Pimpinan & Kantor Pelayanan */}
+          {/* C. Lambang & Logo Resmi Pemerintahan */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-2">
+              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-emerald-600" />
+                <span>Lambang & Logo Resmi Pemerintahan</span>
+              </h4>
+              <span className="text-[11px] text-slate-500 font-medium">
+                Tampil di Header Dashboard, KOP Surat Resmi & Verifikasi TTE
+              </span>
+            </div>
+
+            {uploadError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium flex items-center gap-2">
+                <span>⚠️ {uploadError}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Card 1: Logo Desa / Kelurahan */}
+              <div className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/70 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Logo {villageType === 'kelurahan' ? 'Kelurahan' : 'Desa'}</span>
+                  </div>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    Header Dashboard & KOP Surat
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3.5 pt-1">
+                  {/* Preview Container */}
+                  <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center p-1.5 shrink-0 overflow-hidden relative">
+                    {logoDesaUrl ? (
+                      <img
+                        src={logoDesaUrl}
+                        alt="Logo Desa"
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          const target = e.currentTarget as HTMLImageElement;
+                          if (target.src !== DEFAULT_DESA_LOGO_DATA_URI) {
+                            target.src = DEFAULT_DESA_LOGO_DATA_URI;
+                          }
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white">
+                        <Building2 className="w-7 h-7" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 space-y-2">
+                    <input
+                      ref={desaFileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                      onChange={(e) => handleLogoFileUpload(e, 'desa')}
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => desaFileInputRef.current?.click()}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all hover:scale-105 active:scale-95"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        Pilih Berkas Logo
+                      </button>
+                      {logoDesaUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setLogoDesaUrl('')}
+                          className="px-2.5 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs transition-colors"
+                        >
+                          Hapus
+                        </button>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      Disarankan PNG transparan, JPG, atau SVG (Maks 5 MB).
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200/60">
+                  <label className="text-[10px] font-bold text-slate-600 block mb-1">
+                    Atau gunakan tautan URL online:
+                  </label>
+                  <input
+                    type="text"
+                    value={logoDesaUrl}
+                    onChange={(e) => setLogoDesaUrl(e.target.value)}
+                    placeholder="https://.../logo-desa.png"
+                    className="w-full px-3 py-1.5 text-xs bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Card 2: Logo Kabupaten / Kota */}
+              <div className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/70 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Lambang Daerah (Kabupaten/Kota)</span>
+                  </div>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                    KOP Naskah Dinas
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3.5 pt-1">
+                  {/* Preview Container */}
+                  <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center p-1.5 shrink-0 overflow-hidden relative">
+                    <img
+                      src={logoKabupatenUrl || DEFAULT_KAB_LOGO_DATA_URI}
+                      alt="Logo Pemkab"
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        const target = e.currentTarget as HTMLImageElement;
+                        if (target.src !== DEFAULT_KAB_LOGO_DATA_URI) {
+                          target.src = DEFAULT_KAB_LOGO_DATA_URI;
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex-1 space-y-2">
+                    <input
+                      ref={kabFileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                      onChange={(e) => handleLogoFileUpload(e, 'kabupaten')}
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => kabFileInputRef.current?.click()}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-sm transition-all hover:scale-105 active:scale-95"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        Pilih Berkas Logo
+                      </button>
+                      {logoKabupatenUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setLogoKabupatenUrl('')}
+                          className="px-2.5 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs transition-colors"
+                        >
+                          Pakai Standar
+                        </button>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      Lambang resmi Pemkab / Pemkot untuk KOP Naskah Dinas.
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200/60">
+                  <label className="text-[10px] font-bold text-slate-600 block mb-1">
+                    Atau gunakan tautan URL online:
+                  </label>
+                  <input
+                    type="text"
+                    value={logoKabupatenUrl}
+                    onChange={(e) => setLogoKabupatenUrl(e.target.value)}
+                    placeholder="https://.../lambang-kabupaten.png"
+                    className="w-full px-3 py-1.5 text-xs bg-white rounded-xl border border-slate-200 focus:outline-none focus:border-blue-500 font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* D. Pimpinan & Kantor Pelayanan */}
           <div className="space-y-3">
             <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5 pb-2 border-b border-slate-100">
               <UserCheck className="w-4 h-4 text-emerald-600" />

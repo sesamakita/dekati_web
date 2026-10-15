@@ -60,6 +60,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
           <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-white/5 skew-x-12"></div>
         </div>
 
+        {/* Right side emblem/logo preview in banner */}
+        {profile.logo_desa_url && (
+          <div className="hidden lg:flex absolute right-8 top-1/2 -translate-y-1/2 w-28 h-28 rounded-3xl bg-white/10 backdrop-blur-md border border-white/20 items-center justify-center p-3.5 shadow-2xl z-10 select-none">
+            <img 
+              src={profile.logo_desa_url} 
+              alt={profile.name} 
+              className="w-full h-full object-contain drop-shadow-md" 
+              onError={(e) => {
+                (e.currentTarget as HTMLElement).style.display = 'none';
+              }}
+            />
+          </div>
+        )}
+
         <div className="relative z-10 max-w-2xl">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white/10 backdrop-blur-md text-emerald-200 mb-3 border border-white/15">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>

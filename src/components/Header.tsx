@@ -14,6 +14,7 @@ import {
 import { useData } from '../hooks/useData';
 import { VillageProfileModal } from './VillageProfileModal';
 import { VillageQrModal } from './VillageQrModal';
+import { DEFAULT_DESA_LOGO_DATA_URI } from '../utils/letterTemplateEngine';
 
 interface HeaderProps {
   onSearchChange?: (query: string) => void;
@@ -58,14 +59,39 @@ export const Header: React.FC<HeaderProps> = ({ onSearchChange, onOpenLanding, o
     <header className="shrink-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-6 py-3.5 transition-all">
       <div className="w-full flex items-center justify-between gap-4">
         {/* Village Identity & Emblem */}
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-md shadow-emerald-600/20">
-            <Building2 className="w-6 h-6" />
+        <div 
+          onClick={() => setIsProfileModalOpen(true)}
+          className="flex items-center gap-3.5 cursor-pointer group/header-profile p-1 -m-1 rounded-2xl hover:bg-slate-100/70 transition-all select-none"
+          title="Klik untuk Kelola Profil & Logo Desa"
+        >
+          <div className="w-11 h-11 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center overflow-hidden relative group-hover/header-profile:scale-105 group-hover/header-profile:border-emerald-500 transition-all shrink-0">
+            {profile.logo_desa_url ? (
+              <img 
+                src={profile.logo_desa_url} 
+                alt={profile.name} 
+                className="w-full h-full object-contain p-1"
+                onError={(e) => {
+                  const target = e.currentTarget as HTMLImageElement;
+                  if (target.src !== DEFAULT_DESA_LOGO_DATA_URI) {
+                    target.src = DEFAULT_DESA_LOGO_DATA_URI;
+                  }
+                }}
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white">
+                <Building2 className="w-6 h-6" />
+              </div>
+            )}
           </div>
           <div>
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight">
-              {profile.name}
-            </h1>
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-lg font-bold text-slate-900 tracking-tight group-hover/header-profile:text-emerald-700 transition-colors">
+                {profile.name}
+              </h1>
+              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-1.5 py-0.5 rounded-md opacity-0 group-hover/header-profile:opacity-100 transition-opacity">
+                Ubah Profil & Logo
+              </span>
+            </div>
             <p className="text-xs text-slate-500 font-medium">
               {profile.district} • {profile.regency}
             </p>

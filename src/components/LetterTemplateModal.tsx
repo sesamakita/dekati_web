@@ -1,5 +1,5 @@
 // src/components/LetterTemplateModal.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   X, 
@@ -12,7 +12,10 @@ import {
   Settings2, 
   ShieldCheck, 
   Info,
-  Type
+  Type,
+  Upload,
+  Image,
+  Building2
 } from 'lucide-react';
 import { LetterTemplate, LetterLogoLayout, VillageProfile } from '../types';
 import { 
@@ -60,6 +63,36 @@ export const LetterTemplateModal: React.FC<LetterTemplateModalProps> = ({
   const [logoLayout, setLogoLayout] = useState<LetterLogoLayout>('standard_left');
   const [kabLogoUrl, setKabLogoUrl] = useState('');
   const [desaLogoUrl, setDesaLogoUrl] = useState('');
+
+  const kabFileInputRef = useRef<HTMLInputElement>(null);
+  const desaFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'kab' | 'desa') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Mohon pilih berkas gambar yang sah (PNG, JPG, SVG, WebP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Ukuran berkas logo maksimal 5 MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      if (target === 'kab') {
+        setKabLogoUrl(base64);
+      } else {
+        setDesaLogoUrl(base64);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   const [isSaving, setIsSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -460,50 +493,168 @@ export const LetterTemplateModal: React.FC<LetterTemplateModalProps> = ({
                   </div>
 
                   {(logoLayout === 'standard_left' || logoLayout === 'dual_logo') && (
-                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5 mb-3">
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="text-[11px] font-bold text-slate-700">
-                            URL Lambang Daerah Kabupaten / Kota (Kiri):
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3.5 mb-3">
+                      {/* Logo Pemkab (Kiri) */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                            <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Lambang Pemkab / Pemkot (Kiri):</span>
                           </label>
-                          <button
-                            type="button"
-                            onClick={() => setKabLogoUrl(DEFAULT_KAB_LOGO_URL)}
-                            className="text-[10px] text-emerald-600 hover:underline"
-                          >
-                            Pakai Contoh Pemkab
-                          </button>
-                        </div>
-                        <input
-                          type="text"
-                          value={kabLogoUrl}
-                          onChange={(e) => setKabLogoUrl(e.target.value)}
-                          placeholder="https://.../lambang-kabupaten.png"
-                          className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
-                        />
-                      </div>
-
-                      {logoLayout === 'dual_logo' && (
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="text-[11px] font-bold text-slate-700">
-                              URL Lambang Resmi Desa (Kanan):
-                            </label>
+                          <div className="flex items-center gap-2">
+                            {profile.logo_kabupaten_url && (
+                              <button
+                                type="button"
+                                onClick={() => setKabLogoUrl(profile.logo_kabupaten_url || '')}
+                                className="text-[10px] text-emerald-600 hover:underline font-semibold"
+                              >
+                                Pakai Profil Desa
+                              </button>
+                            )}
                             <button
                               type="button"
-                              onClick={() => setDesaLogoUrl('/logo.svg')}
-                              className="text-[10px] text-emerald-600 hover:underline"
+                              onClick={() => setKabLogoUrl(DEFAULT_KAB_LOGO_DATA_URI)}
+                              className="text-[10px] text-slate-500 hover:underline"
                             >
-                              Pakai Logo Desa Dekati
+                              Reset Standar
                             </button>
                           </div>
+                        </div>
+
+                        <div className="flex items-center gap-2.5">
+                          {/* Mini Thumbnail */}
+                          <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center p-1 shrink-0 overflow-hidden shadow-xs">
+                            <img
+                              src={kabLogoUrl || profile.logo_kabupaten_url || DEFAULT_KAB_LOGO_DATA_URI}
+                              alt="Logo Kab"
+                              className="max-h-full max-w-full object-contain"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).src = DEFAULT_KAB_LOGO_DATA_URI;
+                              }}
+                            />
+                          </div>
+
+                          {/* File input & trigger */}
                           <input
-                            type="text"
-                            value={desaLogoUrl}
-                            onChange={(e) => setDesaLogoUrl(e.target.value)}
-                            placeholder="https://.../logo-desa.png"
-                            className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
+                            ref={kabFileInputRef}
+                            type="file"
+                            accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                            onChange={(e) => handleLogoFileUpload(e, 'kab')}
+                            className="hidden"
                           />
+                          <button
+                            type="button"
+                            onClick={() => kabFileInputRef.current?.click()}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold shadow-xs transition-all hover:scale-105 active:scale-95"
+                          >
+                            <Upload className="w-3.5 h-3.5 text-blue-600" />
+                            Pilih File Logo
+                          </button>
+
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              value={kabLogoUrl.startsWith('data:') ? '✓ Berkas Gambar Terunggah (Base64)' : kabLogoUrl}
+                              onChange={(e) => setKabLogoUrl(e.target.value)}
+                              placeholder="Atau tempel URL gambar (https://...)"
+                              readOnly={kabLogoUrl.startsWith('data:')}
+                              className={`w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 font-mono ${
+                                kabLogoUrl.startsWith('data:') ? 'bg-emerald-50 text-emerald-800 font-semibold' : 'bg-white'
+                              }`}
+                            />
+                          </div>
+                          {kabLogoUrl.startsWith('data:') && (
+                            <button
+                              type="button"
+                              onClick={() => setKabLogoUrl('')}
+                              className="text-[10px] text-rose-600 hover:underline px-1"
+                            >
+                              Ganti
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Logo Desa (Kanan) pada Dual Logo */}
+                      {logoLayout === 'dual_logo' && (
+                        <div className="space-y-2 pt-2.5 border-t border-slate-200/70">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                              <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Lambang Resmi Desa / Kelurahan (Kanan):</span>
+                            </label>
+                            <div className="flex items-center gap-2">
+                              {profile.logo_desa_url && (
+                                <button
+                                  type="button"
+                                  onClick={() => setDesaLogoUrl(profile.logo_desa_url || '')}
+                                  className="text-[10px] text-emerald-600 hover:underline font-semibold"
+                                >
+                                  Pakai Profil Desa
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setDesaLogoUrl(DEFAULT_DESA_LOGO_DATA_URI)}
+                                className="text-[10px] text-slate-500 hover:underline"
+                              >
+                                Reset Standar
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2.5">
+                            {/* Mini Thumbnail */}
+                            <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center p-1 shrink-0 overflow-hidden shadow-xs">
+                              <img
+                                src={desaLogoUrl || profile.logo_desa_url || DEFAULT_DESA_LOGO_DATA_URI}
+                                alt="Logo Desa"
+                                className="max-h-full max-w-full object-contain"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).src = DEFAULT_DESA_LOGO_DATA_URI;
+                                }}
+                              />
+                            </div>
+
+                            {/* File input & trigger */}
+                            <input
+                              ref={desaFileInputRef}
+                              type="file"
+                              accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                              onChange={(e) => handleLogoFileUpload(e, 'desa')}
+                              className="hidden"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => desaFileInputRef.current?.click()}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold shadow-xs transition-all hover:scale-105 active:scale-95"
+                            >
+                              <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                              Pilih File Logo
+                            </button>
+
+                            <div className="flex-1">
+                              <input
+                                type="text"
+                                value={desaLogoUrl.startsWith('data:') ? '✓ Berkas Gambar Terunggah (Base64)' : desaLogoUrl}
+                                onChange={(e) => setDesaLogoUrl(e.target.value)}
+                                placeholder="Atau tempel URL gambar (https://...)"
+                                readOnly={desaLogoUrl.startsWith('data:')}
+                                className={`w-full px-3 py-1.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 font-mono ${
+                                  desaLogoUrl.startsWith('data:') ? 'bg-emerald-50 text-emerald-800 font-semibold' : 'bg-white'
+                                }`}
+                              />
+                            </div>
+                            {desaLogoUrl.startsWith('data:') && (
+                              <button
+                                type="button"
+                                onClick={() => setDesaLogoUrl('')}
+                                className="text-[10px] text-rose-600 hover:underline px-1"
+                              >
+                                Ganti
+                              </button>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
