@@ -150,17 +150,40 @@ class DataService {
 
       // 5. Check village profile
       const currentOfficial = this.getCurrentOfficial();
+      const currentLocalProfile = this.getVillageProfile();
+      const targetVillageCode = currentOfficial?.village_code || currentLocalProfile?.code;
+
       let profQuery = supabase.from('village_profiles').select('*');
-      if (currentOfficial?.village_code) {
-        profQuery = profQuery.eq('code', currentOfficial.village_code);
+      if (targetVillageCode) {
+        profQuery = profQuery.eq('code', targetVillageCode);
       }
       const { data: profData, error: profErr } = await profQuery.limit(1).maybeSingle();
 
-      if (!profErr) {
-        if (profData) {
-          this.setStorage(STORAGE_KEYS.PROFILE, profData);
+      if (!profErr && profData) {
+        const localTime = (currentLocalProfile as any)?.local_updated_at
+          ? new Date((currentLocalProfile as any).local_updated_at).getTime()
+          : 0;
+        const remoteTime = profData.updated_at
+          ? new Date(profData.updated_at).getTime()
+          : 0;
+
+        // If local profile has newer edits that failed to sync to Supabase (e.g. offline or RLS error),
+        // do NOT wipe out user's local edits with stale remote data!
+        if (localTime > 0 && localTime > remoteTime && currentLocalProfile.name && currentLocalProfile.name !== 'Pemerintah Desa') {
+          // Re-attempt sync in background
+          this.updateVillageProfile(currentLocalProfile).catch(() => {});
         } else {
-          this.setStorage(STORAGE_KEYS.PROFILE, initialVillageProfile);
+          // Merge remote data into currentLocalProfile to preserve locally uploaded logos if DB columns are empty
+          const merged: VillageProfile = {
+            ...currentLocalProfile,
+            ...profData,
+            logo_desa_url: profData.logo_desa_url || currentLocalProfile.logo_desa_url || '',
+            logo_kabupaten_url: profData.logo_kabupaten_url || currentLocalProfile.logo_kabupaten_url || '',
+            logo_provinsi_url: profData.logo_provinsi_url || currentLocalProfile.logo_provinsi_url || '',
+            village_type: profData.village_type || currentLocalProfile.village_type || 'desa',
+            kades_nip: profData.kades_nip || currentLocalProfile.kades_nip || ''
+          };
+          this.setStorage(STORAGE_KEYS.PROFILE, merged);
         }
         this.isSupabaseConnected = true;
       }
@@ -461,8 +484,19 @@ class DataService {
           { event: '*', schema: 'public', table: 'village_profiles' },
           (payload) => {
             if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
-              const updated = payload.new as VillageProfile;
-              this.setStorage(STORAGE_KEYS.PROFILE, updated);
+              const remote = payload.new as VillageProfile;
+              const current = this.getVillageProfile();
+              if (!current.code || !remote.code || current.code === remote.code) {
+                const merged: VillageProfile = {
+                  ...current,
+                  ...remote,
+                  logo_desa_url: remote.logo_desa_url || current.logo_desa_url || '',
+                  logo_kabupaten_url: remote.logo_kabupaten_url || current.logo_kabupaten_url || '',
+                  logo_provinsi_url: remote.logo_provinsi_url || current.logo_provinsi_url || '',
+                  village_type: remote.village_type || current.village_type || 'desa'
+                };
+                this.setStorage(STORAGE_KEYS.PROFILE, merged);
+              }
             }
           }
         )
@@ -577,37 +611,119 @@ class DataService {
 
   async updateVillageProfile(profile: Partial<VillageProfile>) {
     const current = this.getVillageProfile();
-    const updated = { ...current, ...profile };
+    const nowIso = new Date().toISOString();
+    const updated: VillageProfile & { local_updated_at?: string } = {
+      ...current,
+      ...profile,
+      local_updated_at: nowIso
+    };
     this.setStorage(STORAGE_KEYS.PROFILE, updated);
 
-    // Sync to Supabase: Multi-desa by code
+    // Sync to Supabase
     try {
-      if (updated.code) {
-        const { data: existing } = await supabase
-          .from('village_profiles')
-          .select('id')
-          .eq('code', updated.code)
-          .maybeSingle();
+      const dbPayload: any = {
+        name: updated.name,
+        code: updated.code || '',
+        district: updated.district || '',
+        regency: updated.regency || '',
+        province: updated.province || '',
+        postal_code: updated.postal_code || '',
+        office_address: updated.office_address || '',
+        office_phone: updated.office_phone || '',
+        office_email: updated.office_email || '',
+        kades_name: updated.kades_name || '',
+        kades_nip: updated.kades_nip || null,
+        sekdes_name: updated.sekdes_name || '',
+        vision: updated.vision || '',
+        mission: Array.isArray(updated.mission) ? updated.mission : [],
+        village_type: updated.village_type || 'desa',
+        logo_desa_url: updated.logo_desa_url || null,
+        logo_kabupaten_url: updated.logo_kabupaten_url || null,
+        logo_provinsi_url: updated.logo_provinsi_url || null,
+        updated_at: nowIso
+      };
 
-        if (existing) {
-          await supabase
-            .from('village_profiles')
-            .update({ ...updated, updated_at: new Date().toISOString() })
-            .eq('id', existing.id);
-        } else {
-          // Buat record desa baru di tabel village_profiles
-          const { id: _, ...insertData } = updated as any;
-          await supabase
-            .from('village_profiles')
-            .insert([{ ...insertData, updated_at: new Date().toISOString() }]);
+      let synced = false;
+
+      // 1. Coba simpan via SECURITY DEFINER RPC jika sudah tersedia di database Supabase
+      try {
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('update_village_profile_secure', {
+          p_code: dbPayload.code,
+          p_name: dbPayload.name,
+          p_village_type: dbPayload.village_type,
+          p_district: dbPayload.district,
+          p_regency: dbPayload.regency,
+          p_province: dbPayload.province,
+          p_postal_code: dbPayload.postal_code,
+          p_office_address: dbPayload.office_address,
+          p_office_phone: dbPayload.office_phone,
+          p_office_email: dbPayload.office_email,
+          p_kades_name: dbPayload.kades_name,
+          p_kades_nip: dbPayload.kades_nip,
+          p_sekdes_name: dbPayload.sekdes_name,
+          p_vision: dbPayload.vision,
+          p_mission: dbPayload.mission,
+          p_logo_desa_url: dbPayload.logo_desa_url,
+          p_logo_kabupaten_url: dbPayload.logo_kabupaten_url,
+          p_logo_provinsi_url: dbPayload.logo_provinsi_url
+        });
+        if (!rpcErr && rpcRes && (rpcRes as any).success) {
+          synced = true;
         }
-      } else {
-        await supabase
-          .from('village_profiles')
-          .upsert({ id: 1, ...updated, updated_at: new Date().toISOString() });
+      } catch {
+        // RPC mungkin belum dijalankan di SQL editor Supabase
+      }
+
+      // 2. Operasi tabel langsung jika RPC belum aktif
+      if (!synced) {
+        if (updated.code) {
+          const { data: existing } = await supabase
+            .from('village_profiles')
+            .select('id')
+            .eq('code', updated.code)
+            .maybeSingle();
+
+          if (existing) {
+            const { error: updErr } = await supabase
+              .from('village_profiles')
+              .update(dbPayload)
+              .eq('id', existing.id);
+
+            if (updErr) {
+              console.warn('[DataService] Update profil dengan kolom penuh gagal, mencoba kolom standar:', updErr);
+              const { logo_desa_url, logo_kabupaten_url, logo_provinsi_url, village_type, kades_nip, ...legacyPayload } = dbPayload;
+              await supabase
+                .from('village_profiles')
+                .update(legacyPayload)
+                .eq('id', existing.id);
+            }
+          } else {
+            const { error: insErr } = await supabase
+              .from('village_profiles')
+              .insert([dbPayload]);
+
+            if (insErr) {
+              const { logo_desa_url, logo_kabupaten_url, logo_provinsi_url, village_type, kades_nip, ...legacyPayload } = dbPayload;
+              await supabase
+                .from('village_profiles')
+                .insert([legacyPayload]);
+            }
+          }
+        } else {
+          const { error: upsertErr } = await supabase
+            .from('village_profiles')
+            .upsert({ id: 1, ...dbPayload });
+
+          if (upsertErr) {
+            const { logo_desa_url, logo_kabupaten_url, logo_provinsi_url, village_type, kades_nip, ...legacyPayload } = dbPayload;
+            await supabase
+              .from('village_profiles')
+              .upsert({ id: 1, ...legacyPayload });
+          }
+        }
       }
     } catch (e) {
-      console.warn('Supabase profile update offline', e);
+      console.warn('Supabase profile update offline:', e);
     }
 
     this.notify();
@@ -1404,7 +1520,17 @@ class DataService {
               .maybeSingle();
 
             if (dbProfile) {
-              this.setStorage(STORAGE_KEYS.PROFILE, dbProfile);
+              const current = this.getVillageProfile();
+              const merged: VillageProfile = {
+                ...current,
+                ...dbProfile,
+                logo_desa_url: dbProfile.logo_desa_url || current.logo_desa_url || '',
+                logo_kabupaten_url: dbProfile.logo_kabupaten_url || current.logo_kabupaten_url || '',
+                logo_provinsi_url: dbProfile.logo_provinsi_url || current.logo_provinsi_url || '',
+                village_type: dbProfile.village_type || current.village_type || 'desa',
+                kades_nip: dbProfile.kades_nip || current.kades_nip || ''
+              };
+              this.setStorage(STORAGE_KEYS.PROFILE, merged);
             }
           } catch (e) {
             console.warn('[Dekati Auth] Failed to fetch village profile:', e);
@@ -1418,12 +1544,19 @@ class DataService {
               ? 'kelurahan'
               : 'desa');
 
-          this.updateVillageProfile({
-            name: user.village_name,
-            code: user.village_code || '',
-            village_type: userVilType,
-            ...(user.role === 'kades' || user.role === 'lurah' ? { kades_name: user.nama_lengkap } : {})
-          });
+          const current = this.getVillageProfile();
+          const isDefaultName = !current.name || current.name === 'Pemerintah Desa';
+          const isDefaultKades = !current.kades_name || current.kades_name === 'Kepala Desa';
+
+          // Inisialisasi awal hanya jika profil masih kosong/default, tidak menimpa kustomisasi pengguna
+          if (isDefaultName || isDefaultKades || !current.code) {
+            this.updateVillageProfile({
+              ...(isDefaultName ? { name: user.village_name } : {}),
+              ...(current.code ? {} : { code: user.village_code || '' }),
+              village_type: current.village_type || userVilType,
+              ...(isDefaultKades && (user.role === 'kades' || user.role === 'lurah') ? { kades_name: user.nama_lengkap } : {})
+            });
+          }
         }
         return { success: true, user };
       }
