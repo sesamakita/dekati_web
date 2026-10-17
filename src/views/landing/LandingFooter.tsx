@@ -2,6 +2,7 @@ import React from 'react';
 import { ShieldCheck, Smartphone } from 'lucide-react';
 import { VillageProfile } from '../../types';
 import { DekatiLogo } from '../../components/DekatiLogo';
+import { scrollToSection } from '../../utils/scrollUtils';
 
 interface LandingFooterProps {
   profile: VillageProfile;
@@ -14,6 +15,11 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({
   onEnterAdmin,
   onOpenDownloadModal,
 }) => {
+  const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    e.preventDefault();
+    scrollToSection(id);
+  };
+
   return (
     <footer className="bg-white border-t border-slate-200 py-14 text-xs text-slate-500">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
@@ -52,10 +58,22 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({
                 </button>
               </li>
               <li>
-                <a href="#lacak-surat" className="hover:text-emerald-600">Lacak Status Surat Mandiri</a>
+                <a href="#lacak-surat" onClick={(e) => handleAnchorClick(e, 'lacak-surat')} className="hover:text-emerald-600">Lacak Status Surat Mandiri</a>
               </li>
               <li>
-                <a href="#transparansi" className="hover:text-emerald-600">Transparansi APBDes 2026</a>
+                <a href="#transparansi" onClick={(e) => handleAnchorClick(e, 'transparansi')} className="hover:text-emerald-600">Transparansi APBDes 2026</a>
+              </li>
+              <li>
+                <a href="#dua-platform" onClick={(e) => handleAnchorClick(e, 'dua-platform')} className="hover:text-emerald-600">Fitur Pamong & Warga</a>
+              </li>
+              <li>
+                <a href="#pengumuman" onClick={(e) => handleAnchorClick(e, 'pengumuman')} className="hover:text-emerald-600">Siaran Desa</a>
+              </li>
+              <li>
+                <a href="#agenda" onClick={(e) => handleAnchorClick(e, 'agenda')} className="hover:text-emerald-600">Agenda Kegiatan</a>
+              </li>
+              <li>
+                <a href="#faq" onClick={(e) => handleAnchorClick(e, 'faq')} className="hover:text-emerald-600">Tanya Jawab</a>
               </li>
             </ul>
           </div>

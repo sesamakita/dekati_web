@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { Search, Check, QrCode } from 'lucide-react';
 import { LetterRequest, VillageProfile } from '../../types';
 import { LetterStatusBadge } from '../../components/StatusBadge';
-import { supabase } from '../../services/supabase';
 
 interface LetterTrackingSectionProps {
   letters: LetterRequest[];
@@ -25,7 +24,7 @@ export const LetterTrackingSection: React.FC<LetterTrackingSectionProps> = ({
     return `${nik.slice(0, 6)}******${nik.slice(12)}`;
   };
 
-  const searchLetter = async (queryStr: string) => {
+  const searchLetter = (queryStr: string) => {
     const q = queryStr.trim();
     if (!q) return;
 
@@ -37,29 +36,7 @@ export const LetterTrackingSection: React.FC<LetterTrackingSectionProps> = ({
           l.letter_official_number.toLowerCase().includes(q.toLowerCase()))
     );
 
-    if (found) {
-      setTrackedLetter(found);
-      return;
-    }
-
-    // Direct Supabase lookup jika belum ada di memori lokal
-    try {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q);
-      let query = supabase.from('letter_requests').select('*');
-      if (isUuid) {
-        query = query.or(`id.eq.${q},tracking_number.eq.${q}`);
-      } else {
-        query = query.eq('tracking_number', q);
-      }
-      const { data } = await query.maybeSingle();
-      if (data) {
-        setTrackedLetter(data as LetterRequest);
-      } else {
-        setTrackedLetter(null);
-      }
-    } catch {
-      setTrackedLetter(null);
-    }
+    setTrackedLetter(found || null);
   };
 
   const handleTrackLetter = (e?: React.FormEvent) => {
@@ -84,7 +61,7 @@ export const LetterTrackingSection: React.FC<LetterTrackingSectionProps> = ({
             Lacak Status Surat Anda Tanpa Perlu Login
           </h2>
           <p className="text-sm text-slate-500 max-w-xl mx-auto">
-            Ketikkan nomor resi/tracking pelacakan surat Anda (didapatkan saat mengajukan permohonan melalui aplikasi mobile warga).
+            Ketikkan nomor resi/tracking pelacakan surat Anda, atau coba salah satu nomor resi demo di bawah ini.
           </p>
         </div>
 
@@ -226,7 +203,7 @@ export const LetterTrackingSection: React.FC<LetterTrackingSectionProps> = ({
                 <h4 className="text-sm font-bold text-slate-800">Nomor Pelacakan Tidak Ditemukan</h4>
                 <p className="text-xs max-w-md mx-auto leading-relaxed">
                   Pastikan nomor resi surat yang Anda masukkan benar (contoh: <code>SRT-202609-0012</code>).
-                  Jika baru mengajukan dari aplikasi mobile, mohon tunggu beberapa saat untuk sinkronisasi cloud.
+                  Gunakan tombol nomor resi demo di atas untuk mencoba simulasi pelacakan.
                 </p>
               </div>
             )}

@@ -84,29 +84,55 @@ export const ApbdesPublicSection: React.FC<ApbdesPublicSectionProps> = ({
           </div>
         </div>
 
-        {/* Inline breakdown items */}
-        <div className="p-6 rounded-3xl bg-slate-800/50 border border-slate-700/60 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-          <div className="space-y-1">
-            <div className="text-slate-400">Dana Desa (DDS) APBN:</div>
-            <div className="font-bold text-white">Rp 1.200.000.000</div>
-            <div className="text-emerald-400 text-[11px]">81.6% Terserap</div>
-          </div>
-          <div className="space-y-1">
-            <div className="text-slate-400">Alokasi Dana Desa (ADD) APBD:</div>
-            <div className="font-bold text-white">Rp 650.000.000</div>
-            <div className="text-emerald-400 text-[11px]">78.4% Terserap</div>
-          </div>
-          <div className="space-y-1">
-            <div className="text-slate-400">Pembangunan Infrastruktur:</div>
-            <div className="font-bold text-white">Rp 950.000.000</div>
-            <div className="text-teal-400 text-[11px]">77.8% Fisik Selesai</div>
-          </div>
-          <div className="space-y-1">
-            <div className="text-slate-400">Penyelenggaraan Siltap:</div>
-            <div className="font-bold text-white">Rp 550.000.000</div>
-            <div className="text-teal-400 text-[11px]">78.1% Terserap</div>
-          </div>
+        {/* Inline breakdown items (data-driven dari APBDes) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+          {apbdes.pendapatan.items.slice(0, 2).map((item) => (
+            <div
+              key={`pd-${item.account_code}`}
+              className="p-4 rounded-2xl bg-slate-800/50 border border-slate-700/60 backdrop-blur-sm"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-slate-400 font-semibold leading-snug">{item.name}</span>
+                <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px] font-extrabold uppercase">
+                  Pendapatan
+                </span>
+              </div>
+              <div className="mt-2 font-bold text-white text-sm">
+                Rp {item.budget_amount.toLocaleString('id-ID')}
+              </div>
+              <div className="mt-1 text-emerald-400 font-bold">{item.percentage}% Terserap</div>
+            </div>
+          ))}
+          {apbdes.belanja.items.slice(0, 2).map((item) => (
+            <div
+              key={`bl-${item.account_code}`}
+              className="p-4 rounded-2xl bg-slate-800/50 border border-slate-700/60 backdrop-blur-sm"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-slate-400 font-semibold leading-snug">{item.name}</span>
+                <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-teal-500/10 text-teal-400 text-[10px] font-extrabold uppercase">
+                  Belanja
+                </span>
+              </div>
+              <div className="mt-2 font-bold text-white text-sm">
+                Rp {item.budget_amount.toLocaleString('id-ID')}
+              </div>
+              <div className="mt-1 text-teal-400 font-bold">{item.percentage}% Terserap</div>
+            </div>
+          ))}
+          {apbdes.pendapatan.items.length === 0 && apbdes.belanja.items.length === 0 && (
+            <div className="lg:col-span-4 p-6 rounded-2xl bg-slate-800/50 border border-dashed border-slate-700 text-center text-slate-400">
+              Rincian APBDes {apbdes.fiscal_year} akan diumumkan menyusul setelah penetapan
+              bersama BPD dan Musrenbangdes.
+            </div>
+          )}
         </div>
+
+        {/* Catatan rincian lengkap */}
+        <p className="text-center text-[11px] text-slate-500">
+          Data rincian pendapatan & belanja {profile.name} TA {apbdes.fiscal_year} · diperbarui
+          berkala oleh Sekretariat Desa.
+        </p>
       </div>
     </section>
   );

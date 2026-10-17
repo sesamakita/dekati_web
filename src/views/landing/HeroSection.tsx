@@ -11,15 +11,19 @@ import {
   Clock, 
   Award 
 } from 'lucide-react';
+import { VillageProfile } from '../../types';
+import { scrollToSection } from '../../utils/scrollUtils';
 
 interface HeroSectionProps {
   onEnterAdmin: () => void;
   onOpenDownloadModal: () => void;
+  profile?: VillageProfile;
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
   onEnterAdmin,
   onOpenDownloadModal,
+  profile,
 }) => {
   return (
     <section id="hero" className="relative pt-12 pb-20 overflow-hidden">
@@ -32,13 +36,21 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           <div className="inline-flex flex-wrap items-center justify-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80 shadow-sm">
               <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-              Portal Resmi Pemerintahan Desa & Kelurahan Terpadu
+              {profile?.name && profile.name !== 'Pemerintah Desa'
+                ? `Portal Resmi ${profile.name}`
+                : 'Portal Resmi Pemerintahan Desa & Kelurahan Terpadu'}
             </span>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200/80">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               Cloud Database Supabase Real-Time
             </span>
           </div>
+
+          {profile?.name && profile.name !== 'Pemerintah Desa' && (
+            <p className="text-xs sm:text-sm font-semibold text-slate-500 tracking-wide">
+              {profile.district} · {profile.regency} · {profile.province}
+            </p>
+          )}
 
           {/* Main Title */}
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 tracking-tight leading-[1.15]">
@@ -76,6 +88,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
             <a
               href="#lacak-surat"
+              onClick={(e) => {
+                e.preventDefault();
+                scrollToSection('lacak-surat');
+              }}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-4 rounded-2xl text-slate-600 hover:text-slate-900 text-sm font-semibold hover:bg-slate-100 transition-all"
             >
               <Search className="w-4 h-4 text-slate-400" />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   X, 
@@ -22,6 +22,21 @@ interface MobileDownloadModalProps {
 export const MobileDownloadModal: React.FC<MobileDownloadModalProps> = ({ isOpen, onClose }) => {
   const [copied, setCopied] = useState(false);
   const [actionNotice, setActionNotice] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
+
+  // Tutup dengan tombol Escape + kunci scroll halaman saat modal terbuka
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
   if (typeof document === 'undefined') return null;
@@ -58,7 +73,7 @@ export const MobileDownloadModal: React.FC<MobileDownloadModalProps> = ({ isOpen
       onClick={onClose}
     >
       <div 
-        className="my-auto w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden animate-scale-up"
+        className="m-auto w-full max-w-lg max-h-[calc(100vh-2rem)] bg-white rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden animate-scale-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
