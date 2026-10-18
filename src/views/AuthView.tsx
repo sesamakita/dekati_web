@@ -33,6 +33,7 @@ import {
   detectVillageType 
 } from '../services/wilayahService';
 import { CustomDialog } from '../components/CustomDialog';
+import { DekatiLogo } from '../components/DekatiLogo';
 
 interface AuthViewProps {
   onLoginSuccess: (role: 'admin_desa' | 'kades', userEmail?: string) => void;
@@ -307,21 +308,25 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
           <div className="space-y-6 relative z-10">
             {/* Emblem / Identity */}
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-inner">
-                <Building2 className="w-6 h-6" />
+            <div className="space-y-3.5">
+              <div className="flex items-center gap-3">
+                <DekatiLogo variant="white" className="h-10 w-auto" />
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/15 text-emerald-200 border border-white/20 backdrop-blur-sm">
+                  Portal Pamong
+                </span>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl font-black tracking-tight">Dekati</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white">
-                    v1.0
-                  </span>
-                </div>
-                <p className="text-xs text-emerald-200 font-medium">
-                  {profile.name} • {profile.district}
+              <div className="border-l-2 border-emerald-400/40 pl-3 py-0.5 select-none">
+                <p className="text-xs font-semibold text-emerald-100 tracking-wide leading-tight">
+                  Desa &amp; Kelurahan
+                </p>
+                <p className="text-[11px] font-medium text-emerald-200/90 tracking-tight leading-tight mt-0.5">
+                  semakin dekat di hati warga
                 </p>
               </div>
+              <p className="text-[11px] text-emerald-200/80 font-medium flex items-center gap-1.5 pt-0.5">
+                <MapPin className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+                <span>{profile.name} • {profile.district}</span>
+              </p>
             </div>
 
             {/* Title */}
