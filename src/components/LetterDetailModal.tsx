@@ -1,5 +1,5 @@
 // src/components/LetterDetailModal.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   X, 
@@ -7,14 +7,27 @@ import {
   User, 
   Calendar, 
   CheckCircle, 
+  CheckCircle2,
   AlertCircle, 
+  AlertTriangle,
   Printer, 
   QrCode, 
   ShieldCheck, 
   FileCheck2, 
   XCircle, 
   ExternalLink,
-  Eye
+  Eye,
+  Check,
+  Hash,
+  Copy,
+  Inbox,
+  ArrowRight,
+  Clock,
+  Info,
+  Sparkles,
+  Phone,
+  MapPin,
+  FileSpreadsheet
 } from 'lucide-react';
 import { LetterRequest } from '../types';
 import { LetterStatusBadge } from './StatusBadge';
@@ -27,264 +40,836 @@ interface LetterDetailModalProps {
   onClose: () => void;
 }
 
-export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter, onClose }) => {
-  const { updateLetterStatus, activeRole, profile, letterTemplates } = useData();
+export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter: propLetter, onClose }) => {
+  const { letters, updateLetterStatus, activeRole, profile, letterTemplates } = useData();
+  
+  // Realtime reactive letter object: prioritaskan data terkini dari global letters store
+  const liveLetter = letters.find((l) => l.id === propLetter.id) || propLetter;
+  
+  // State lokal agar alur tahapan bergerak instan (0ms) otomatis di dalam modal tanpa perlu tutup/buka
+  const [letter, setLetter] = useState<LetterRequest>(liveLetter);
+
+  // Selalu sinkronkan saat data letters di store diperbarui
+  useEffect(() => {
+    const fresh = letters.find((l) => l.id === propLetter.id);
+    if (fresh) {
+      setLetter(fresh);
+      if (fresh.letter_official_number) {
+        setOfficialNumber(fresh.letter_official_number);
+      }
+    }
+  }, [letters, propLetter.id]);
+  
+  // Nomor registrasi surat resmi desa
   const [officialNumber, setOfficialNumber] = useState(
     letter.letter_official_number ||
-      `470/${Math.floor(10 + Math.random() * 90)}/${letter.letter_name.split('(')[1]?.replace(')', '') || 'SK'}/IX/2026`
+      `470/${Math.floor(10 + Math.random() * 90)}/${letter.letter_name.split('(')[1]?.replace(')', '') || 'SK'}/X/2026`
   );
+  
+  // Rejection states
   const [rejectReason, setRejectReason] = useState('');
   const [rejectError, setRejectError] = useState('');
   const [showRejectBox, setShowRejectBox] = useState(false);
+
+  // Revision states (Minta Revisi Dokumen ke Warga)
+  const [revisionNote, setRevisionNote] = useState('');
+  const [revisionError, setRevisionError] = useState('');
+  const [showRevisionBox, setShowRevisionBox] = useState(false);
+
+  // Interactive document verification checklist state (dokumen -> 'valid' | 'needs_fix')
+  const [verifiedDocs, setVerifiedDocs] = useState<Record<string, 'valid' | 'needs_fix'>>({});
+  
+  // Sub-modal states
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
   const [selectedPreviewDoc, setSelectedPreviewDoc] = useState<{ url: string; name: string } | null>(null);
+  const [copiedNumber, setCopiedNumber] = useState(false);
 
-  const handleStartVerification = () => {
-    updateLetterStatus(letter.id, 'in_verification');
+  // Quick revision templates
+  const revisionTemplates = [
+    'Foto KTP buram / tidak terbaca jelas, mohon unggah ulang.',
+    'Surat Pengantar RT/RW belum distempel / bertandatangan basah.',
+    'Kartu Keluarga (KK) tidak sesuai dengan nama pemohon.',
+    'Foto tempat usaha kurang jelas atau belum melampirkan tampak depan.'
+  ];
+
+  // Helper kalkulasi status langkah (Tahap 1 s/d 4)
+  const getStepProgress = () => {
+    switch (letter.status) {
+      case 'submitted':
+        return { step: 1, percent: 25, label: 'Menunggu Pemeriksaan' };
+      case 'in_verification':
+      case 'needs_revision':
+        return { step: 2, percent: 50, label: letter.status === 'needs_revision' ? 'Menunggu Revisi Warga' : 'Pemeriksaan Syarat' };
+      case 'approved':
+        return { step: 3, percent: 75, label: 'Nomor Siap & Menunggu TTE' };
+      case 'signed':
+      case 'ready_for_pickup':
+      case 'completed':
+        return { step: 4, percent: 100, label: 'TTE Sah & Siap Diterbitkan' };
+      case 'rejected':
+        return { step: 2, percent: 50, label: 'Pengajuan Ditolak' };
+      default:
+        return { step: 1, percent: 25, label: 'Pengajuan Baru' };
+    }
   };
 
-  const handleApprove = () => {
-    updateLetterStatus(letter.id, 'approved', {
+  const progress = getStepProgress();
+
+  // Workflow Handlers: Menggerakkan alur tahapan secara instan otomatis di dalam modal
+  const handleStartVerification = async () => {
+    const updated = await updateLetterStatus(letter.id, 'in_verification');
+    if (updated) setLetter(updated);
+  };
+
+  const handleApprove = async () => {
+    const updated = await updateLetterStatus(letter.id, 'approved', {
       official_number: officialNumber,
     });
+    if (updated) setLetter(updated);
   };
 
-  const handleSignTte = () => {
-    updateLetterStatus(letter.id, 'signed', {
+  const handleSignTte = async () => {
+    const updated = await updateLetterStatus(letter.id, 'signed', {
       official_number: officialNumber,
       signed_by_name: profile.kades_name,
     });
+    if (updated) setLetter(updated);
   };
 
-  const handleReject = () => {
+  const handleRequestRevision = async () => {
+    if (!revisionNote.trim()) {
+      setRevisionError('Mohon tuliskan rincian dokumen yang perlu diperbaiki oleh pemohon.');
+      return;
+    }
+    const updated = await updateLetterStatus(letter.id, 'needs_revision', {
+      notes: revisionNote,
+    });
+    if (updated) setLetter(updated);
+    setShowRevisionBox(false);
+    setRevisionError('');
+  };
+
+  const handleReject = async () => {
     if (!rejectReason.trim()) {
       setRejectError('Mohon masukkan alasan penolakan berkas untuk pemohon.');
       return;
     }
-    updateLetterStatus(letter.id, 'rejected', {
+    const updated = await updateLetterStatus(letter.id, 'rejected', {
       rejection_reason: rejectReason,
     });
+    if (updated) setLetter(updated);
     setShowRejectBox(false);
     setRejectError('');
   };
+
+  const toggleDocVerification = (docName: string, status: 'valid' | 'needs_fix') => {
+    setVerifiedDocs((prev) => ({
+      ...prev,
+      [docName]: prev[docName] === status ? undefined as any : status,
+    }));
+  };
+
+  const handleCopyNumber = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(officialNumber);
+      setCopiedNumber(true);
+      setTimeout(() => setCopiedNumber(false), 2000);
+    }
+  };
+
+  // Hitung jumlah berkas terverifikasi
+  const totalAttachments = letter.attachments?.length || 0;
+  const verifiedCount = Object.values(verifiedDocs).filter((v) => v === 'valid').length;
 
   if (typeof document === 'undefined') return null;
 
   return createPortal(
     <>
       <div 
-        className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 md:p-8 bg-slate-950/70 backdrop-blur-sm animate-fade-in"
+        className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 md:p-6 bg-slate-950/75 backdrop-blur-sm animate-fade-in"
         onClick={onClose}
       >
-        {/* Modal Container: Max-height with safe viewport distance up and down */}
+        {/* Modal Container: Bento Design Max-W-4XL for spacious reading & inspecting */}
         <div 
-          className="bg-white rounded-3xl max-w-2xl w-full max-h-[calc(100vh-3.5rem)] sm:max-h-[calc(100vh-5rem)] shadow-2xl border border-slate-100 flex flex-col overflow-hidden relative my-auto animate-scale-up"
+          className="bg-white rounded-3xl max-w-4xl w-full max-h-[calc(100vh-2.5rem)] shadow-2xl border border-slate-100 flex flex-col overflow-hidden relative my-auto animate-scale-up"
           onClick={(e) => e.stopPropagation()}
         >
-          
-          {/* Fixed Header Bar */}
-          <div className="shrink-0 px-6 sm:px-7 py-4 border-b border-slate-100 flex items-start justify-between bg-white">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+          {/* ========================================================================= */}
+          {/* 1. FIXED HEADER BAR                                                       */}
+          {/* ========================================================================= */}
+          <div className="shrink-0 px-6 sm:px-8 py-4 border-b border-slate-100 flex items-start justify-between bg-white">
+            <div className="min-w-0 pr-4">
+              <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                <span className="font-mono text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200 shadow-xs">
                   {letter.tracking_number}
                 </span>
                 <LetterStatusBadge status={letter.status} />
+                {letter.letter_official_number && (
+                  <span className="hidden sm:inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
+                    <Hash className="w-3 h-3 text-slate-500" />
+                    Reg: {letter.letter_official_number}
+                  </span>
+                )}
               </div>
-              <h2 className="text-lg font-bold text-slate-900">
+              <h2 className="text-xl font-extrabold text-slate-900 tracking-tight truncate">
                 {letter.letter_name}
               </h2>
             </div>
+            
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
+              title="Tutup Modal"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Scrollable Body */}
-          <div className="flex-1 overflow-y-auto px-6 sm:px-7 py-5 space-y-4">
-            {/* Citizen Bio Card (Bento Style) */}
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80">
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-slate-600" />
-              Data Pemohon & Warga Subjek
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div>
-                <span className="text-slate-400">Nama Subjek Surat:</span>
-                <p className="font-bold text-slate-800 text-sm">{letter.citizen_name}</p>
+          {/* ========================================================================= */}
+          {/* 2. PILIHAN 1: TOP HORIZONTAL STEPPER (BENTO PROGRESS CARD)                 */}
+          {/* ========================================================================= */}
+          <div className="shrink-0 px-6 sm:px-8 py-4 bg-gradient-to-b from-slate-50 to-white border-b border-slate-200/70">
+            {/* Stepper Header Meta */}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Alur Tahapan Layanan:
+                </span>
+                <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+                  letter.status === 'rejected'
+                    ? 'bg-rose-50 text-rose-700 border-rose-200'
+                    : letter.status === 'needs_revision'
+                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                      : progress.percent === 100
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                        : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                }`}>
+                  {letter.status === 'rejected'
+                    ? 'Pengajuan Ditolak'
+                    : letter.status === 'needs_revision'
+                      ? 'Perlu Revisi Warga'
+                      : `Tahap ${progress.step} dari 4 • ${progress.percent}% Selesai`}
+                </span>
               </div>
-              <div>
-                <span className="text-slate-400">NIK:</span>
-                <p className="font-mono font-semibold text-slate-800">{letter.citizen_nik}</p>
-              </div>
-              <div>
-                <span className="text-slate-400">Akun Pengaju:</span>
-                <p className="font-medium text-slate-700">{letter.applicant_name} ({letter.applicant_phone || 'WhatsApp'})</p>
-              </div>
-              <div>
-                <span className="text-slate-400">Alamat Kependudukan:</span>
-                <p className="font-medium text-slate-700">{letter.citizen_address || 'Wilayah Desa'}</p>
-              </div>
+
+              <span className="text-xs font-semibold text-slate-600 hidden sm:inline-block">
+                Status Terkini: <strong className="text-emerald-800">{progress.label}</strong>
+              </span>
             </div>
 
-            <div className="mt-3 pt-3 border-t border-slate-200/70">
-              <span className="text-slate-400 text-xs">Keperluan / Keterangan:</span>
-              <p className="text-xs font-semibold text-slate-900 mt-0.5 bg-white p-2.5 rounded-xl border border-slate-200/60">
-                "{letter.purpose}"
-              </p>
-            </div>
-          </div>
-
-          {/* Attachments Section */}
-          <div className="mt-4">
-            <div className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 flex items-center justify-between">
-              <span>Lampiran Dokumen Persyaratan ({letter.attachments?.length || 0})</span>
-              <span className="text-[11px] text-slate-400 font-normal">Klik untuk pratinjau</span>
-            </div>
-            <div className="grid grid-cols-3 gap-2.5">
-              {letter.attachments?.map((att, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => setSelectedPreviewDoc({ url: att.url, name: att.name })}
-                  className="group cursor-pointer p-2.5 bg-slate-50 hover:bg-emerald-50/50 rounded-xl border border-slate-200/80 hover:border-emerald-300 transition-all flex flex-col items-center text-center"
-                >
-                  <div className="w-full h-16 rounded-lg bg-slate-200 overflow-hidden mb-1.5 relative">
-                    <img
-                      src={att.url}
-                      alt={att.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    />
-                    <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                      <Eye className="w-4 h-4 text-white" />
-                    </div>
-                  </div>
-                  <span className="text-[11px] font-bold text-slate-700 truncate w-full">
-                    {att.name}
-                  </span>
-                  <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-0.5 mt-0.5">
-                    <CheckCircle className="w-2.5 h-2.5" /> Terlampir
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Official Numbering Field */}
-          {(letter.status === 'in_verification' || letter.status === 'approved' || letter.status === 'signed' || letter.status === 'completed') && (
-            <div className="mt-4 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200/80">
-              <label className="block text-xs font-bold text-emerald-950 mb-1">
-                Nomor Surat Resmi Desa (Buku Registrasi Desa):
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={officialNumber}
-                  onChange={(e) => setOfficialNumber(e.target.value)}
-                  disabled={letter.status === 'signed' || letter.status === 'completed'}
-                  className="flex-1 px-3.5 py-2 text-xs font-mono font-bold text-slate-900 bg-white rounded-xl border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:bg-slate-100"
+            {/* Stepper Steps Row */}
+            <div className="relative">
+              {/* Background Connecting Line */}
+              <div className="absolute top-5 left-6 right-6 h-1 bg-slate-200 -translate-y-1/2 z-0 hidden sm:block rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-500 rounded-full ${
+                    letter.status === 'rejected' ? 'bg-rose-500' : 'bg-emerald-600'
+                  }`}
+                  style={{ width: `${letter.status === 'rejected' ? 45 : (progress.step - 1) * 33.33}%` }}
                 />
               </div>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Format penomoran standar Kementerian Dalam Negeri dan Pemerintah Desa.
-              </p>
-            </div>
-          )}
 
-          {/* Timeline Process */}
-          <div className="mt-4">
-            <div className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">
-              Histori Alur Penerbitan
-            </div>
-            <div className="space-y-2 text-xs">
-              {(Array.isArray(letter.timeline) ? letter.timeline : []).map((step, sIdx) => (
-                <div key={sIdx} className="flex items-center justify-between py-1 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span className="font-semibold text-slate-800">{step.title}</span>
-                    {step.actor && (
-                      <span className="text-[10px] text-slate-400">({step.actor})</span>
+              {/* 4 Step Items */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 relative z-10">
+                {/* Step 1: Pengajuan Masuk */}
+                <div className="flex sm:flex-col items-center gap-2.5 sm:gap-1.5 text-left sm:text-center p-2 sm:p-0 rounded-xl bg-white sm:bg-transparent border sm:border-0 border-slate-200/80 shadow-xs sm:shadow-none">
+                  <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all ${
+                    progress.step > 1
+                      ? 'bg-emerald-600 text-white shadow-sm ring-4 ring-emerald-100'
+                      : progress.step === 1
+                        ? 'bg-emerald-600 text-white ring-4 ring-emerald-200 animate-pulse'
+                        : 'bg-slate-100 text-slate-400 border border-slate-200'
+                  }`}>
+                    {progress.step > 1 ? (
+                      <Check className="w-5 h-5" />
+                    ) : (
+                      <Inbox className="w-4 h-4" />
                     )}
                   </div>
-                  <span className="text-slate-400 font-mono text-[11px]">{step.time}</span>
+                  <div>
+                    <span className="text-[11.5px] font-bold text-slate-800 block leading-tight">
+                      1. Pengajuan
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      Diajukan Warga
+                    </span>
+                  </div>
                 </div>
-              ))}
+
+                {/* Step 2: Verifikasi Dokumen */}
+                <div className="flex sm:flex-col items-center gap-2.5 sm:gap-1.5 text-left sm:text-center p-2 sm:p-0 rounded-xl bg-white sm:bg-transparent border sm:border-0 border-slate-200/80 shadow-xs sm:shadow-none">
+                  <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all ${
+                    letter.status === 'rejected'
+                      ? 'bg-rose-600 text-white ring-4 ring-rose-200'
+                      : letter.status === 'needs_revision'
+                        ? 'bg-amber-500 text-white ring-4 ring-amber-200'
+                        : progress.step > 2
+                          ? 'bg-emerald-600 text-white shadow-sm ring-4 ring-emerald-100'
+                          : progress.step === 2
+                            ? 'bg-sky-600 text-white ring-4 ring-sky-200 animate-pulse'
+                            : 'bg-slate-100 text-slate-400 border border-slate-200'
+                  }`}>
+                    {letter.status === 'rejected' ? (
+                      <XCircle className="w-5 h-5" />
+                    ) : letter.status === 'needs_revision' ? (
+                      <AlertTriangle className="w-5 h-5" />
+                    ) : progress.step > 2 ? (
+                      <Check className="w-5 h-5" />
+                    ) : (
+                      <FileCheck2 className="w-4 h-4" />
+                    )}
+                  </div>
+                  <div>
+                    <span className={`text-[11.5px] font-bold block leading-tight ${
+                      letter.status === 'rejected' 
+                        ? 'text-rose-700' 
+                        : letter.status === 'needs_revision' 
+                          ? 'text-amber-800' 
+                          : progress.step === 2 
+                            ? 'text-sky-800 font-extrabold' 
+                            : 'text-slate-800'
+                    }`}>
+                      2. Verifikasi
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      {letter.status === 'needs_revision' ? 'Minta Revisi' : 'Pemeriksaan Syarat'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Step 3: Nomor Agenda & Draf */}
+                <div className="flex sm:flex-col items-center gap-2.5 sm:gap-1.5 text-left sm:text-center p-2 sm:p-0 rounded-xl bg-white sm:bg-transparent border sm:border-0 border-slate-200/80 shadow-xs sm:shadow-none">
+                  <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all ${
+                    progress.step > 3
+                      ? 'bg-emerald-600 text-white shadow-sm ring-4 ring-emerald-100'
+                      : progress.step === 3
+                        ? 'bg-indigo-600 text-white ring-4 ring-indigo-200 animate-pulse'
+                        : 'bg-slate-100 text-slate-400 border border-slate-200'
+                  }`}>
+                    {progress.step > 3 ? (
+                      <Check className="w-5 h-5" />
+                    ) : (
+                      <Hash className="w-4 h-4" />
+                    )}
+                  </div>
+                  <div>
+                    <span className={`text-[11.5px] font-bold block leading-tight ${
+                      progress.step === 3 ? 'text-indigo-800 font-extrabold' : 'text-slate-800'
+                    }`}>
+                      3. Penomoran
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      Buku Agenda Desa
+                    </span>
+                  </div>
+                </div>
+
+                {/* Step 4: TTE QR & Selesai */}
+                <div className="flex sm:flex-col items-center gap-2.5 sm:gap-1.5 text-left sm:text-center p-2 sm:p-0 rounded-xl bg-white sm:bg-transparent border sm:border-0 border-slate-200/80 shadow-xs sm:shadow-none">
+                  <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all ${
+                    progress.step === 4 && letter.status !== 'rejected'
+                      ? 'bg-emerald-600 text-white ring-4 ring-emerald-200 shadow-md shadow-emerald-600/30'
+                      : 'bg-slate-100 text-slate-400 border border-slate-200'
+                  }`}>
+                    {progress.step === 4 && letter.status !== 'rejected' ? (
+                      <ShieldCheck className="w-5 h-5 text-white" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4" />
+                    )}
+                  </div>
+                  <div>
+                    <span className={`text-[11.5px] font-bold block leading-tight ${
+                      progress.step === 4 && letter.status !== 'rejected' ? 'text-emerald-800 font-extrabold' : 'text-slate-800'
+                    }`}>
+                      4. TTE Kades
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      Surat Digital Terbit
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Rejection Form Box */}
-          {showRejectBox && (
-            <div className="mt-4 p-4 bg-rose-50 rounded-2xl border border-rose-200">
-              <label className="block text-xs font-bold text-rose-900 mb-1">
-                Alasan Penolakan Berkas:
-              </label>
-              <textarea
-                value={rejectReason}
-                onChange={(e) => {
-                  setRejectReason(e.target.value);
-                  if (rejectError) setRejectError('');
-                }}
-                placeholder="Contoh: Lampiran foto KTP buram dan tidak terbaca, mohon unggah ulang..."
-                rows={2}
-                className="w-full p-2.5 text-xs text-slate-800 bg-white rounded-xl border border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-400/20"
-              />
-              {rejectError ? (
-                <div className="flex items-center gap-1.5 mt-1.5 text-[11px] font-bold text-rose-600">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  <span>{rejectError}</span>
+          {/* ========================================================================= */}
+          {/* 3. SCROLLABLE BODY                                                        */}
+          {/* ========================================================================= */}
+          <div className="flex-1 overflow-y-auto px-6 sm:px-8 py-5 space-y-5 bg-[#F8FAFC]">
+            
+            {/* Status Alert Banners if Rejected or Needs Revision */}
+            {letter.status === 'rejected' && (
+              <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3 animate-fade-in">
+                <XCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                <div className="text-xs">
+                  <span className="font-bold text-rose-900 block">Pengajuan Surat Ini Telah Ditolak</span>
+                  <p className="text-rose-700 mt-0.5">Alasan: {letter.rejection_reason || 'Persyaratan administrasi tidak memenuhi ketentuan.'}</p>
                 </div>
-              ) : null}
-              <div className="flex justify-end gap-2 mt-2">
-                <button
-                  onClick={() => {
-                    setShowRejectBox(false);
-                    setRejectError('');
-                  }}
-                  className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={handleReject}
-                  className="px-3 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm shadow-rose-600/20 transition-all"
-                >
-                  Konfirmasi Tolak
-                </button>
+              </div>
+            )}
+
+            {letter.status === 'needs_revision' && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 animate-fade-in">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="text-xs">
+                  <span className="font-bold text-amber-900 block">Status: Menunggu Perbaikan / Revisi Berkas oleh Pemohon</span>
+                  <p className="text-amber-800 mt-0.5">
+                    Catatan untuk warga: "{letter.rejection_reason || 'Mohon melengkapi berkas persyaratan yang kurang atau buram.'}"
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* BENTO GRID: Data Pemohon & Keperluan */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Data Pemohon Card */}
+              <div className="p-4 sm:p-5 bg-white rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
+                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                  <div className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Data Warga Subjek Surat</span>
+                  </div>
+                  <span className="text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/80">
+                    Terdaftar di BIK
+                  </span>
+                </div>
+
+                <div className="space-y-2.5 text-xs">
+                  <div>
+                    <span className="text-slate-400 text-[11px] block">Nama Lengkap Subjek:</span>
+                    <p className="font-bold text-slate-900 text-sm">{letter.citizen_name}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">NIK Pemohon:</span>
+                      <p className="font-mono font-bold text-slate-800">{letter.citizen_nik}</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Kontak WhatsApp:</span>
+                      <p className="font-medium text-slate-700 flex items-center gap-1">
+                        <Phone className="w-3 h-3 text-emerald-600 shrink-0" />
+                        <span>{letter.applicant_phone || 'Tersinkron APK'}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 text-[11px] block">Alamat Kependudukan:</span>
+                    <p className="font-medium text-slate-700 flex items-start gap-1">
+                      <MapPin className="w-3 h-3 text-slate-400 shrink-0 mt-0.5" />
+                      <span>{letter.citizen_address || `Wilayah ${profile.name}`}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rincian Permohonan & Keperluan Card */}
+              <div className="p-4 sm:p-5 bg-white rounded-2xl border border-slate-200/80 shadow-xs space-y-3 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                    <div className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Rincian Surat & Keperluan</span>
+                    </div>
+                    <span className="text-[10.5px] font-semibold text-slate-500">
+                      Pengaju: {letter.applicant_name}
+                    </span>
+                  </div>
+
+                  <div className="mt-2.5 space-y-2 text-xs">
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Jenis Format Layanan:</span>
+                      <p className="font-bold text-slate-800">{letter.letter_name}</p>
+                    </div>
+
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Keperluan / Keterangan Tertulis:</span>
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 text-slate-800 font-medium leading-relaxed italic text-[11.5px]">
+                        "{letter.purpose}"
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 text-[11px] text-slate-400 flex items-center justify-between">
+                  <span>Waktu Pengajuan:</span>
+                  <span className="font-mono text-slate-600 font-semibold">{letter.created_at || 'Hari ini'}</span>
+                </div>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Fixed Footer Action Buttons Bar */}
-          <div className="shrink-0 px-6 sm:px-7 py-3.5 border-t border-slate-100 bg-slate-50/80 flex flex-wrap items-center justify-between gap-2.5">
+            {/* =================================================================== */}
+            {/* 4. DOKUMEN PERSYARATAN & CEKLIS VERIFIKASI                         */}
+            {/* =================================================================== */}
+            <div className="p-4 sm:p-5 bg-white rounded-2xl border border-slate-200/80 shadow-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3.5 pb-2.5 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <FileCheck2 className="w-4 h-4 text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Pemeriksaan Dokumen Persyaratan ({totalAttachments})
+                  </span>
+                </div>
+                
+                {totalAttachments > 0 && (
+                  <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                    verifiedCount === totalAttachments
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : 'bg-slate-100 text-slate-700 border-slate-200'
+                  }`}>
+                    {verifiedCount === totalAttachments ? (
+                      <span className="flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3 text-emerald-600" />
+                        Semua Syarat Sesuai ({verifiedCount}/{totalAttachments})
+                      </span>
+                    ) : (
+                      <span>Ceklis Verifikasi: {verifiedCount} dari {totalAttachments} Sesuai</span>
+                    )}
+                  </span>
+                )}
+              </div>
+
+              {totalAttachments === 0 ? (
+                <div className="text-center py-6 text-slate-400 text-xs">
+                  <FileText className="w-8 h-8 mx-auto text-slate-300 mb-1.5" />
+                  <span>Tidak ada lampiran dokumen khusus untuk jenis surat ini.</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {letter.attachments?.map((att, idx) => {
+                    const checkStatus = verifiedDocs[att.name];
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-2xl border transition-all flex flex-col justify-between ${
+                          checkStatus === 'valid'
+                            ? 'bg-emerald-50/50 border-emerald-300 ring-2 ring-emerald-100'
+                            : checkStatus === 'needs_fix'
+                              ? 'bg-amber-50/50 border-amber-300 ring-2 ring-amber-100'
+                              : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        {/* Thumbnail Image */}
+                        <div
+                          onClick={() => setSelectedPreviewDoc({ url: att.url, name: att.name })}
+                          className="w-full h-28 rounded-xl bg-slate-200 overflow-hidden mb-2 relative cursor-pointer group"
+                          title="Klik untuk membuka pratinjau resolusi tinggi"
+                        >
+                          <img
+                            src={att.url}
+                            alt={att.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity gap-1.5 text-white text-xs font-bold">
+                            <Eye className="w-4 h-4 text-white" />
+                            <span>Perbesar</span>
+                          </div>
+                        </div>
+
+                        {/* Title & Status */}
+                        <div>
+                          <div className="flex items-center justify-between gap-1 mb-1.5">
+                            <span className="text-xs font-bold text-slate-800 truncate" title={att.name}>
+                              {att.name}
+                            </span>
+                            {checkStatus === 'valid' ? (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                                Valid
+                              </span>
+                            ) : checkStatus === 'needs_fix' ? (
+                              <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
+                                Kurang
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-medium text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded">
+                                Perlu Cek
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Quick Verification Buttons */}
+                          <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-200/60">
+                            <button
+                              type="button"
+                              onClick={() => toggleDocVerification(att.name, 'valid')}
+                              className={`py-1 rounded-lg text-[10.5px] font-bold flex items-center justify-center gap-1 transition-all ${
+                                checkStatus === 'valid'
+                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                  : 'bg-white text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 border border-slate-200'
+                              }`}
+                            >
+                              <Check className="w-3 h-3" />
+                              <span>Sesuai</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => toggleDocVerification(att.name, 'needs_fix')}
+                              className={`py-1 rounded-lg text-[10.5px] font-bold flex items-center justify-center gap-1 transition-all ${
+                                checkStatus === 'needs_fix'
+                                  ? 'bg-amber-600 text-white shadow-xs'
+                                  : 'bg-white text-slate-600 hover:text-amber-700 hover:bg-amber-50 border border-slate-200'
+                              }`}
+                            >
+                              <AlertCircle className="w-3 h-3" />
+                              <span>Buram</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* =================================================================== */}
+            {/* 5. TAHAP 3: BUKU AGENDA DESA (PENOMORAN SURAT RESMI)                 */}
+            {/* =================================================================== */}
+            {(letter.status === 'in_verification' || letter.status === 'approved' || letter.status === 'signed' || letter.status === 'completed') && (
+              <div className="p-4 sm:p-5 bg-gradient-to-r from-emerald-50/70 via-teal-50/50 to-emerald-50/70 rounded-2xl border border-emerald-200 shadow-xs space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Hash className="w-4 h-4 text-emerald-700" />
+                    <label className="text-xs font-extrabold text-emerald-950 uppercase tracking-wider">
+                      Nomor Surat Resmi (Buku Registrasi Agenda Desa):
+                    </label>
+                  </div>
+                  <span className="text-[11px] font-semibold text-emerald-800 bg-white px-2 py-0.5 rounded-md border border-emerald-200">
+                    Standar Kemendagri RI
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={officialNumber}
+                    onChange={(e) => setOfficialNumber(e.target.value)}
+                    disabled={letter.status === 'signed' || letter.status === 'completed'}
+                    placeholder="Contoh: 470/042/DS-SKM/X/2026"
+                    className="flex-1 px-4 py-2.5 text-xs font-mono font-bold text-slate-900 bg-white rounded-xl border border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:bg-slate-100 shadow-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCopyNumber}
+                    className="px-3 py-2.5 text-xs font-bold text-emerald-800 bg-white hover:bg-emerald-100 border border-emerald-300 rounded-xl flex items-center gap-1.5 transition-all shrink-0"
+                    title="Salin Nomor Surat"
+                  >
+                    {copiedNumber ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="hidden sm:inline text-emerald-700">Tersalin!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5 text-emerald-700" />
+                        <span className="hidden sm:inline">Salin</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-emerald-800/80 leading-relaxed font-normal">
+                  Nomor ini otomatis tercatat di Buku Induk Administrasi Umum Desa dan tertera pada QR Code TTE pengesahan Kades/Lurah.
+                </p>
+              </div>
+            )}
+
+            {/* =================================================================== */}
+            {/* 6. TIMELINE & AUDIT TRAIL                                           */}
+            {/* =================================================================== */}
+            <div className="p-4 sm:p-5 bg-white rounded-2xl border border-slate-200/80 shadow-xs">
+              <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
+                <span className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                  Histori Alur &amp; Catatan Petugas
+                </span>
+                <span className="text-[11px] text-slate-400">Audit Trail Terverifikasi</span>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                {(Array.isArray(letter.timeline) ? letter.timeline : []).map((step, sIdx) => (
+                  <div key={sIdx} className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                      <span className="font-semibold text-slate-800">{step.title}</span>
+                      {step.actor && (
+                        <span className="text-[10px] text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 font-medium">
+                          {step.actor}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-slate-400 font-mono text-[11px] shrink-0 ml-2">{step.time}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* =================================================================== */}
+            {/* 7. REVISION BOX (Permintaan Perbaikan Berkas)                       */}
+            {/* =================================================================== */}
+            {showRevisionBox && (
+              <div className="p-4 sm:p-5 bg-amber-50 rounded-2xl border border-amber-300 shadow-sm animate-fade-in space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    <span>Minta Perbaikan / Revisi Berkas ke Pemohon:</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                    Warga dapat upload ulang via APK
+                  </span>
+                </div>
+
+                {/* Quick Chips */}
+                <div className="flex flex-wrap gap-1.5">
+                  <span className="text-[11px] text-amber-800 font-bold self-center">Pilihan Cepat:</span>
+                  {revisionTemplates.map((tmpl, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setRevisionNote(tmpl);
+                        if (revisionError) setRevisionError('');
+                      }}
+                      className="text-[10.5px] font-medium bg-white hover:bg-amber-100 text-amber-900 px-2.5 py-1 rounded-lg border border-amber-200 transition-colors"
+                    >
+                      {tmpl.split(',')[0]}
+                    </button>
+                  ))}
+                </div>
+
+                <textarea
+                  value={revisionNote}
+                  onChange={(e) => {
+                    setRevisionNote(e.target.value);
+                    if (revisionError) setRevisionError('');
+                  }}
+                  placeholder="Tuliskan catatan detail untuk pemohon (contoh: Foto surat pengantar RT belum distempel, mohon foto ulang dengan jelas)..."
+                  rows={2}
+                  className="w-full p-3 text-xs text-slate-800 bg-white rounded-xl border border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-500/20 shadow-xs"
+                />
+
+                {revisionError && (
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-800">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{revisionError}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    onClick={() => {
+                      setShowRevisionBox(false);
+                      setRevisionError('');
+                    }}
+                    className="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white rounded-xl"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    onClick={handleRequestRevision}
+                    className="px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-sm transition-all"
+                  >
+                    Kirim Permintaan Revisi
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* =================================================================== */}
+            {/* 8. REJECTION BOX (Penolakan Berkas Permanen)                        */}
+            {/* =================================================================== */}
+            {showRejectBox && (
+              <div className="p-4 sm:p-5 bg-rose-50 rounded-2xl border border-rose-300 shadow-sm animate-fade-in space-y-3">
+                <div className="flex items-center gap-2 text-rose-900 font-bold text-xs">
+                  <XCircle className="w-4 h-4 text-rose-600" />
+                  <span>Konfirmasi Penolakan Berkas Permohonan:</span>
+                </div>
+
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => {
+                    setRejectReason(e.target.value);
+                    if (rejectError) setRejectError('');
+                  }}
+                  placeholder="Masukkan alasan penolakan berkas (contoh: Pemohon tidak berdomisili di wilayah desa ini)..."
+                  rows={2}
+                  className="w-full p-3 text-xs text-slate-800 bg-white rounded-xl border border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-400/20 shadow-xs"
+                />
+
+                {rejectError && (
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-rose-600">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{rejectError}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    onClick={() => {
+                      setShowRejectBox(false);
+                      setRejectError('');
+                    }}
+                    className="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white rounded-xl"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    onClick={handleReject}
+                    className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm transition-all"
+                  >
+                    Konfirmasi Tolak Permohonan
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ========================================================================= */}
+          {/* 9. FIXED FOOTER ACTION BUTTONS BAR                                        */}
+          {/* ========================================================================= */}
+          <div className="shrink-0 px-6 sm:px-8 py-3.5 border-t border-slate-100 bg-white flex flex-wrap items-center justify-between gap-3">
+            {/* Left Action Buttons: Cetak & Validasi QR */}
             <div className="flex items-center gap-2">
-              {/* Print and QR buttons if approved or signed */}
               {(letter.status === 'signed' || letter.status === 'completed' || letter.status === 'approved') && (
                 <>
                   <button
                     onClick={() => setShowPrintModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-700 hover:text-emerald-700 bg-slate-100 hover:bg-emerald-50 rounded-xl transition-all"
+                    className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 hover:text-emerald-800 bg-slate-100 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 rounded-xl transition-all shadow-xs"
                   >
                     <Printer className="w-3.5 h-3.5" />
-                    Cetak Surat Resmi
+                    <span>Cetak Surat Resmi</span>
                   </button>
                   <button
                     onClick={() => setShowQrModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all"
+                    className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-all shadow-xs"
                   >
                     <QrCode className="w-3.5 h-3.5" />
-                    Lihat Validasi QR
+                    <span>Validasi QR TTE</span>
                   </button>
                 </>
               )}
             </div>
 
+            {/* Right Action Buttons: Step by Step Workflow Progression */}
             <div className="flex items-center gap-2 ml-auto">
-              {letter.status !== 'rejected' && letter.status !== 'completed' && !showRejectBox && (
+              {/* Tombol Minta Revisi */}
+              {letter.status !== 'rejected' && letter.status !== 'signed' && letter.status !== 'completed' && !showRevisionBox && !showRejectBox && (
                 <button
+                  type="button"
+                  onClick={() => setShowRevisionBox(true)}
+                  className="px-3 py-2 text-xs font-bold text-amber-700 hover:bg-amber-50 border border-amber-300 rounded-xl transition-all flex items-center gap-1"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>Minta Revisi</span>
+                </button>
+              )}
+
+              {/* Tombol Tolak Berkas */}
+              {letter.status !== 'rejected' && letter.status !== 'signed' && letter.status !== 'completed' && !showRejectBox && !showRevisionBox && (
+                <button
+                  type="button"
                   onClick={() => setShowRejectBox(true)}
                   className="px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
                 >
@@ -292,44 +877,54 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter, on
                 </button>
               )}
 
-              {/* Step 1: Start Verification */}
-              {letter.status === 'submitted' && (
+              {/* TAHAP 1 -> TAHAP 2: Mulai Verifikasi Berkas */}
+              {(letter.status === 'submitted' || letter.status === 'needs_revision') && (
                 <button
                   onClick={handleStartVerification}
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl shadow-sm transition-all"
+                  className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-xl shadow-md shadow-sky-600/20 transition-all"
                 >
                   <FileCheck2 className="w-4 h-4" />
-                  Mulai Verifikasi Berkas
+                  <span>Mulai Verifikasi Syarat ➔</span>
                 </button>
               )}
 
-              {/* Step 2: Approve & Issue Number */}
+              {/* TAHAP 2 -> TAHAP 3: Tetapkan Nomor & Teruskan ke Kades */}
               {letter.status === 'in_verification' && (
                 <button
                   onClick={handleApprove}
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition-all"
+                  className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md shadow-indigo-600/20 transition-all"
                 >
                   <FileCheck2 className="w-4 h-4" />
-                  Tetapkan No. & Siapkan TTE
+                  <span>Loloskan Syarat &amp; Buat No. Agenda ➔</span>
                 </button>
               )}
 
-              {/* Step 3: Sign Digital TTE (Kades or Admin) */}
+              {/* TAHAP 3 -> TAHAP 4: Pengesahan TTE Digital QR Kades/Lurah */}
               {letter.status === 'approved' && (
                 <button
                   onClick={handleSignTte}
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md shadow-emerald-600/20 transition-all"
+                  className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md shadow-emerald-600/25 transition-all ring-2 ring-emerald-400/30"
                 >
                   <ShieldCheck className="w-4 h-4" />
-                  Sahkan TTE QR Kades
+                  <span>Sahkan TTE QR Kades ➔</span>
                 </button>
+              )}
+
+              {/* Sudah TTE Sah */}
+              {(letter.status === 'signed' || letter.status === 'completed') && (
+                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 px-3.5 py-2 rounded-xl border border-emerald-200">
+                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  <span>Surat Sah &amp; Terbit</span>
+                </div>
               )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Preview Image Modal with higher z-index than parent modal */}
+      {/* ========================================================================= */}
+      {/* 10. LIGHTBOX PREVIEW DOKUMEN MODAL (High Z-Index)                         */}
+      {/* ========================================================================= */}
       {selectedPreviewDoc && (
         <div 
           className="fixed inset-0 z-[10002] flex items-center justify-center p-3 sm:p-6 bg-slate-950/85 backdrop-blur-md animate-fade-in"

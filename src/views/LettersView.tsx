@@ -225,7 +225,7 @@ export const LettersView: React.FC = () => {
       {/* Modals */}
       {selectedLetter && (
         <LetterDetailModal
-          letter={selectedLetter}
+          letter={letters.find((l) => l.id === selectedLetter.id) || selectedLetter}
           onClose={() => setSelectedLetter(null)}
         />
       )}

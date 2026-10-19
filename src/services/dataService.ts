@@ -845,6 +845,13 @@ class DataService {
         done: true,
         actor: 'Pemeriksa Berkas'
       });
+    } else if (status === 'needs_revision') {
+      updateOrCreateStep('revisi berkas', {
+        title: `Permintaan Revisi Dokumen: ${extra?.notes || extra?.rejection_reason || 'Mohon perbaiki berkas persyaratan'}`,
+        time: nowTime,
+        done: true,
+        actor: 'Operator Pelayanan'
+      });
     }
 
     letter.timeline = existingTimeline;
