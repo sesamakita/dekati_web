@@ -8,7 +8,8 @@ import {
   ApbdesData,
   VillageProfile,
   EmergencyContact,
-  VillageEvent
+  VillageEvent,
+  VillageOfficial
 } from '../types';
 
 export const initialVillageProfile: VillageProfile = {
@@ -32,6 +33,198 @@ export const initialVillageProfile: VillageProfile = {
     'Membangun infrastruktur desa yang merata melalui perencanaan partisipatif Musrenbangdes'
   ]
 };
+
+export const initialVillageOfficials: VillageOfficial[] = [
+  {
+    id: 'off-01',
+    nik: '3201011005780001',
+    nip: '19780510 200501 1 002',
+    nama_lengkap: 'Ahmad Subarjo, S.Pd.',
+    email: 'kades@sukamaju.desa.id',
+    role: 'kades',
+    jabatan: 'Kepala Desa Sukamaju',
+    village_code: '32.01.1010.2003',
+    village_name: 'Desa Sukamaju',
+    village_type: 'desa',
+    phone_number: '0812-3456-7801',
+    whatsapp: '081234567801',
+    avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+    can_sign_tte: true,
+    status: 'active',
+    order_index: 1
+  },
+  {
+    id: 'off-02',
+    nik: '3201011508820002',
+    nip: '19820815 200801 1 004',
+    nama_lengkap: 'Rudi Hartono, S.Sos.',
+    email: 'sekdes@sukamaju.desa.id',
+    role: 'sekdes',
+    jabatan: 'Sekretaris Desa (Carik)',
+    village_code: '32.01.1010.2003',
+    village_name: 'Desa Sukamaju',
+    village_type: 'desa',
+    phone_number: '0812-3456-7802',
+    whatsapp: '081234567802',
+    avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
+    can_sign_tte: false,
+    status: 'active',
+    order_index: 2
+  },
+  {
+    id: 'off-03',
+    nik: '3201014502890003',
+    nama_lengkap: 'Nurul Hidayati, S.E.',
+    email: 'keuangan@sukamaju.desa.id',
+    role: 'kaur_keuangan',
+    jabatan: 'Kaur Keuangan (Bendahara Desa)',
+    village_code: '32.01.1010.2003',
+    village_name: 'Desa Sukamaju',
+    village_type: 'desa',
+    phone_number: '0813-2233-4401',
+    whatsapp: '081322334401',
+    avatar_url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
+    can_sign_tte: false,
+    status: 'active',
+    order_index: 3
+  },
+  {
+    id: 'off-04',
+    nik: '3201012204850004',
+    nama_lengkap: 'Bambang Irawan, S.T.',
+    email: 'perencanaan@sukamaju.desa.id',
+    role: 'kaur_pembangunan',
+    jabatan: 'Kaur Perencanaan & Pembangunan',
+    village_code: '32.01.1010.2003',
+    village_name: 'Desa Sukamaju',
+    village_type: 'desa',
+    phone_number: '0813-2233-4402',
+    whatsapp: '081322334402',
+    avatar_url: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&auto=format&fit=crop&q=80',
+    can_sign_tte: false,
+    status: 'active',
+    order_index: 4
+  },
+  {
+    id: 'off-05',
+    nik: '3201015607870005',
+    nama_lengkap: 'Endang Suryani, A.Md.',
+    email: 'tu@sukamaju.desa.id',
+    role: 'kaur_tu_umum',
+    jabatan: 'Kaur Tata Usaha & Umum',
+    village_code: '32.01.1010.2003',
+    village_name: 'Desa Sukamaju',
+    village_type: 'desa',
+    phone_number: '0813-2233-4403',
+    whatsapp: '081322334403',
+    avatar_url: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=300&auto=format&fit=crop&q=80',
+    can_sign_tte: false,
+    status: 'active',
+    order_index: 5
+  },
+  {
+    id: 'off-06',
+    nik: '3201011809900006',
+    nama_lengkap: 'Agus Setiawan',
+    email: 'pelayanan@sukamaju.desa.id',
+    role: 'kasi_layanan',
+    jabatan: 'Kasi Pelayanan Masyarakat',
+    village_code: '32.01.1010.2003',
+    village_name: 'Desa Sukamaju',
+    village_type: 'desa',
+    phone_number: '0821-4455-6601',
+    whatsapp: '082144556601',
+    avatar_url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80',
+    can_sign_tte: false,
+    status: 'active',
+    order_index: 6
+  },
+  {
+    id: 'off-07',
+    nik: '3201010911860007',
+    nama_lengkap: 'Dedi Supriadi, S.IP.',
+    email: 'pemerintahan@sukamaju.desa.id',
+    role: 'kasi_pemerintahan',
+    jabatan: 'Kasi Pemerintahan Desa',
+    village_code: '32.01.1010.2003',
+    village_name: 'Desa Sukamaju',
+    village_type: 'desa',
+    phone_number: '0821-4455-6602',
+    whatsapp: '082144556602',
+    avatar_url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&auto=format&fit=crop&q=80',
+    can_sign_tte: false,
+    status: 'active',
+    order_index: 7
+  },
+  {
+    id: 'off-08',
+    nik: '3201014812880008',
+    nama_lengkap: 'Siti Masitoh, S.Pd.',
+    email: 'kesra@sukamaju.desa.id',
+    role: 'kasi_kesra',
+    jabatan: 'Kasi Kesejahteraan (Kesra)',
+    village_code: '32.01.1010.2003',
+    village_name: 'Desa Sukamaju',
+    village_type: 'desa',
+    phone_number: '0821-4455-6603',
+    whatsapp: '082144556603',
+    avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&auto=format&fit=crop&q=80',
+    can_sign_tte: false,
+    status: 'active',
+    order_index: 8
+  },
+  {
+    id: 'off-09',
+    nik: '3201011103750009',
+    nama_lengkap: 'M. Hendra Gunawan',
+    email: 'kadus1@sukamaju.desa.id',
+    role: 'kadus',
+    jabatan: 'Kepala Dusun I (Dusun Sukamaju)',
+    village_code: '32.01.1010.2003',
+    village_name: 'Desa Sukamaju',
+    village_type: 'desa',
+    phone_number: '0812-3456-7891',
+    whatsapp: '081234567891',
+    avatar_url: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=300&auto=format&fit=crop&q=80',
+    can_sign_tte: false,
+    status: 'active',
+    order_index: 9
+  },
+  {
+    id: 'off-10',
+    nik: '3201011206760010',
+    nama_lengkap: 'Sukirman',
+    email: 'kadus2@sukamaju.desa.id',
+    role: 'kadus',
+    jabatan: 'Kepala Dusun II (Dusun Cikaret)',
+    village_code: '32.01.1010.2003',
+    village_name: 'Desa Sukamaju',
+    village_type: 'desa',
+    phone_number: '0813-9988-7766',
+    whatsapp: '081399887766',
+    avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    can_sign_tte: false,
+    status: 'active',
+    order_index: 10
+  },
+  {
+    id: 'off-11',
+    nik: '3201011708700011',
+    nama_lengkap: 'Serka (Purn) M. Dahlan',
+    email: 'linmas@sukamaju.desa.id',
+    role: 'satlinmas',
+    jabatan: 'Komandan Satlinmas & Trantibum',
+    village_code: '32.01.1010.2003',
+    village_name: 'Desa Sukamaju',
+    village_type: 'desa',
+    phone_number: '0811-2233-4455',
+    whatsapp: '081122334455',
+    avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+    can_sign_tte: false,
+    status: 'active',
+    order_index: 11
+  }
+];
 
 export const initialCitizens: Citizen[] = [];
 
@@ -87,6 +280,12 @@ export const initialLetterRequests: LetterRequest[] = [
     citizen_name: 'Siti Nurhaliza',
     citizen_nik: '3201096712010003',
     citizen_address: 'Dusun Mekar, RT 02 / RW 01, Desa Sukamaju',
+    rt_number: '01',
+    rw_number: '01',
+    rt_status: 'approved_by_rt',
+    rt_leader_name: 'Bpk. Hendra Gunawan',
+    rt_leader_phone: '0812-3456-7891',
+    rt_approved_at: '18 September 2026, 09.00 WIB',
     status: 'signed',
     purpose: 'Persyaratan pengajuan keringanan biaya pendidikan (beasiswa)',
     letter_official_number: '470/15/Kesra/IX/2026',
@@ -97,6 +296,7 @@ export const initialLetterRequests: LetterRequest[] = [
     created_at: '18 September 2026, 08.30 WIB',
     timeline: [
       { title: 'Permohonan diajukan warga', time: '18 Sep 2026, 08.30', done: true, actor: 'Siti Nurhaliza' },
+      { title: 'Rekomendasi disetujui Ketua RT 01', time: '18 Sep 2026, 09.00', done: true, actor: 'Bpk. Hendra Gunawan' },
       { title: 'Berkas diverifikasi operator', time: '18 Sep 2026, 13.45', done: true, actor: 'Kasi Pelayanan' },
       { title: 'Nomor surat resmi diterbitkan', time: '19 Sep 2026, 09.10', done: true, actor: 'Sekretariat Desa' },
       { title: 'Disahkan TTE QR oleh Kepala Desa', time: '19 Sep 2026, 11.20', done: true, actor: 'Ahmad Subarjo, S.Pd.' }
@@ -114,11 +314,18 @@ export const initialLetterRequests: LetterRequest[] = [
     citizen_name: 'Budi Santoso',
     citizen_nik: '3201010808900006',
     citizen_address: 'Dusun Cikaret, RT 05 / RW 02, Desa Sukamaju',
+    rt_number: '05',
+    rw_number: '02',
+    rt_status: 'approved_by_rt',
+    rt_leader_name: 'Bpk. Sukirman',
+    rt_leader_phone: '0813-9988-7766',
+    rt_approved_at: '20 September 2026, 10.30 WIB',
     status: 'in_verification',
     purpose: 'Pengajuan pinjaman modal usaha KUR ke bank',
     created_at: '20 September 2026, 09.15 WIB',
     timeline: [
       { title: 'Permohonan diajukan warga', time: '20 Sep 2026, 09.15', done: true, actor: 'Budi Santoso' },
+      { title: 'Rekomendasi disetujui Ketua RT 05', time: '20 Sep 2026, 10.30', done: true, actor: 'Bpk. Sukirman' },
       { title: 'Berkas diverifikasi operator', time: '20 Sep 2026, 14.05', done: true, actor: 'Kasi Pelayanan' },
       { title: 'Persetujuan Kepala Desa', time: 'Menunggu', done: false, actor: 'Ahmad Subarjo, S.Pd.' },
       { title: 'Pengesahan TTE QR & siap unduh', time: 'Menunggu', done: false }
@@ -136,15 +343,64 @@ export const initialLetterRequests: LetterRequest[] = [
     citizen_name: 'Asep Saepudin',
     citizen_nik: '3201012506980009',
     citizen_address: 'Dusun Sukamaju, RT 03 / RW 01, Desa Sukamaju',
-    status: 'in_verification',
+    rt_number: '03',
+    rw_number: '01',
+    rt_status: 'pending_rt',
+    rt_leader_name: 'Bpk. Bambang Herwanto',
+    rt_leader_phone: '0812-3456-7893',
+    status: 'pending_rt',
     purpose: 'Lamaran kerja & pembuatan SKCK tingkat desa',
     created_at: '21 September 2026, 10.00 WIB',
     timeline: [
       { title: 'Permohonan diajukan warga', time: '21 Sep 2026, 10.00', done: true, actor: 'Asep Saepudin' },
-      { title: 'Pemeriksaan berkas oleh operator', time: '21 Sep 2026, 15.30', done: true, actor: 'Kasi Pelayanan' },
+      { title: 'Verifikasi & Rekomendasi Ketua RT 03', time: 'Menunggu konfirmasi', done: false, actor: 'Bpk. Bambang Herwanto' },
+      { title: 'Pemeriksaan berkas oleh operator', time: 'Menunggu', done: false, actor: 'Kasi Pelayanan' },
       { title: 'Persetujuan Kepala Desa', time: 'Menunggu', done: false, actor: 'Ahmad Subarjo, S.Pd.' },
       { title: 'Pengesahan TTE QR & siap unduh', time: 'Menunggu', done: false }
     ]
+  }
+];
+
+export const initialNeighborhoodUnits = [
+  {
+    id: 'rt-lk-001',
+    village_code: '2102050003',
+    dusun_name: 'Dusun I Lancang Kuning',
+    rw_number: '01',
+    rt_number: '01',
+    rt_leader_name: 'Bpk. Hendra Gunawan',
+    rt_leader_phone: '0812-6600-0001',
+    is_active: true
+  },
+  {
+    id: 'rt-lk-002',
+    village_code: '2102050003',
+    dusun_name: 'Dusun I Lancang Kuning',
+    rw_number: '01',
+    rt_number: '02',
+    rt_leader_name: 'Bpk. Wawan Setiawan',
+    rt_leader_phone: '0812-6600-0002',
+    is_active: true
+  },
+  {
+    id: 'rt-lk-003',
+    village_code: '2102050003',
+    dusun_name: 'Dusun II Lancang Kuning',
+    rw_number: '02',
+    rt_number: '03',
+    rt_leader_name: 'Bpk. Bambang Herwanto',
+    rt_leader_phone: '0812-6600-0003',
+    is_active: true
+  },
+  {
+    id: 'rt-lk-004',
+    village_code: '2102050003',
+    dusun_name: 'Dusun II Lancang Kuning',
+    rw_number: '02',
+    rt_number: '04',
+    rt_leader_name: 'Bpk. Sukirman',
+    rt_leader_phone: '0813-6600-0004',
+    is_active: true
   }
 ];
 

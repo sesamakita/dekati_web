@@ -18,6 +18,13 @@ interface LetterStatusBadgeProps {
 
 export const LetterStatusBadge: React.FC<LetterStatusBadgeProps> = ({ status }) => {
   switch (status) {
+    case 'pending_rt':
+      return (
+        <span className="badge-pill bg-purple-50 text-purple-700 border border-purple-200/80">
+          <Clock className="w-3 h-3 text-purple-600" />
+          Menunggu RT
+        </span>
+      );
     case 'submitted':
       return (
         <span className="badge-pill bg-amber-50 text-amber-700 border border-amber-200/80">

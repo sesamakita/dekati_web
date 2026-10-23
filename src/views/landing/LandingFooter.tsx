@@ -58,6 +58,9 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({
                 </button>
               </li>
               <li>
+                <a href="#organisasi" onClick={(e) => handleAnchorClick(e, 'organisasi')} className="hover:text-emerald-600 font-medium">Struktur Organisasi &amp; Pamong Desa</a>
+              </li>
+              <li>
                 <a href="#lacak-surat" onClick={(e) => handleAnchorClick(e, 'lacak-surat')} className="hover:text-emerald-600">Lacak Status Surat Mandiri</a>
               </li>
               <li>

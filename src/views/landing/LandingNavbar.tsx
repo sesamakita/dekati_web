@@ -23,12 +23,13 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Navigasi utama (desktop) — 5 prioritas agar header tetap lega
+  // Navigasi utama (desktop) — prioritas agar header tetap lega dan fungsional
   const navItems: Array<{ href: string; label: string }> = [
     { href: '#hero', label: 'Beranda' },
     { href: '#profil-desa', label: 'Profil Desa' },
+    { href: '#organisasi', label: 'Aparatur Desa' },
     { href: '#lacak-surat', label: 'Lacak Surat' },
-    { href: '#transparansi', label: 'APBDes Publik' },
+    { href: '#transparansi', label: 'APBDes' },
     { href: '#darurat', label: 'Darurat' },
   ];
 

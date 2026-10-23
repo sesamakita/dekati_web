@@ -119,6 +119,14 @@ export const VillageProfileSection: React.FC<VillageProfileSectionProps> = ({ pr
                   </div>
                 </div>
               )}
+
+              <a
+                href="#organisasi"
+                className="mt-3 inline-flex items-center justify-between w-full p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 text-xs font-bold border border-emerald-200/80 transition-colors group/orglink"
+              >
+                <span>Lihat Aparatur &amp; Kontak WhatsApp</span>
+                <span className="text-emerald-600 group-hover/orglink:translate-x-0.5 transition-transform">→</span>
+              </a>
             </div>
           </div>
 

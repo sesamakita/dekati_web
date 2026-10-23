@@ -1,5 +1,4 @@
-// src/components/LetterDetailModal.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   X, 
@@ -27,13 +26,17 @@ import {
   Sparkles,
   Phone,
   MapPin,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Building2,
+  MessageSquare,
+  Users
 } from 'lucide-react';
 import { LetterRequest } from '../types';
 import { LetterStatusBadge } from './StatusBadge';
 import { useData } from '../hooks/useData';
 import { LetterPrintModal } from './LetterPrintModal';
 import { QrVerifyModal } from './QrVerifyModal';
+import { wahaService } from '../services/wahaService';
 
 interface LetterDetailModalProps {
   letter: LetterRequest;
@@ -41,7 +44,18 @@ interface LetterDetailModalProps {
 }
 
 export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter: propLetter, onClose }) => {
-  const { letters, updateLetterStatus, activeRole, profile, letterTemplates } = useData();
+  const { 
+    letters, 
+    citizens,
+    neighborhoodUnits,
+    updateLetterStatus, 
+    updateRtApprovalStatus, 
+    assignLetterNeighborhoodUnit,
+    getNeighborhoodLeader, 
+    activeRole, 
+    profile, 
+    letterTemplates 
+  } = useData();
   
   // Realtime reactive letter object: prioritaskan data terkini dari global letters store
   const liveLetter = letters.find((l) => l.id === propLetter.id) || propLetter;
@@ -59,6 +73,47 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter: pr
       }
     }
   }, [letters, propLetter.id]);
+
+  // Deteksi nomor RT dan RW secara cerdas dari data warga / alamat pemohon jika kosong
+  const resolvedRtNumber = useMemo(() => {
+    if (letter.rt_number) return letter.rt_number;
+    const citizen = citizens.find((c) => c.nik === letter.citizen_nik);
+    if (citizen?.rt) return citizen.rt;
+    const match = letter.citizen_address?.match(/RT\s*(\d+)/i);
+    return match ? match[1].padStart(2, '0') : '';
+  }, [letter.rt_number, letter.citizen_nik, letter.citizen_address, citizens]);
+
+  const resolvedRwNumber = useMemo(() => {
+    if (letter.rw_number) return letter.rw_number;
+    const citizen = citizens.find((c) => c.nik === letter.citizen_nik);
+    if (citizen?.rw) return citizen.rw;
+    const match = letter.citizen_address?.match(/RW\s*(\d+)/i);
+    return match ? match[1].padStart(2, '0') : '';
+  }, [letter.rw_number, letter.citizen_nik, letter.citizen_address, citizens]);
+
+  const matchedLeader = useMemo(() => {
+    return (
+      getNeighborhoodLeader(resolvedRtNumber, resolvedRwNumber) ||
+      getNeighborhoodLeader(letter.rt_number, letter.rw_number)
+    );
+  }, [getNeighborhoodLeader, resolvedRtNumber, resolvedRwNumber, letter.rt_number, letter.rw_number]);
+
+  const currentRtLeaderName = letter.rt_leader_name || matchedLeader?.rt_leader_name || 'Ketua RT Setempat';
+  const currentRtLeaderPhone = matchedLeader?.rt_leader_phone || letter.rt_leader_phone || '';
+
+  const [isChangingRt, setIsChangingRt] = useState(false);
+
+  const handleSelectRtUnit = async (unitId: string) => {
+    const unit = neighborhoodUnits.find((u) => u.id === unitId);
+    if (!unit) return;
+    const updated = await assignLetterNeighborhoodUnit(letter.id, unit);
+    if (updated) {
+      setLetter(updated);
+      setIsChangingRt(false);
+      setWaSuccessBanner(`Wilayah RT berhasil dihubungkan ke RT ${unit.rt_number} / RW ${unit.rw_number} (${unit.rt_leader_name})`);
+      setTimeout(() => setWaSuccessBanner(null), 5000);
+    }
+  };
   
   // Nomor registrasi surat resmi desa
   const [officialNumber, setOfficialNumber] = useState(
@@ -84,6 +139,8 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter: pr
   const [showQrModal, setShowQrModal] = useState(false);
   const [selectedPreviewDoc, setSelectedPreviewDoc] = useState<{ url: string; name: string } | null>(null);
   const [copiedNumber, setCopiedNumber] = useState(false);
+  const [sendingWa, setSendingWa] = useState(false);
+  const [waSuccessBanner, setWaSuccessBanner] = useState<string | null>(null);
 
   // Quick revision templates
   const revisionTemplates = [
@@ -96,6 +153,8 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter: pr
   // Helper kalkulasi status langkah (Tahap 1 s/d 4)
   const getStepProgress = () => {
     switch (letter.status) {
+      case 'pending_rt':
+        return { step: 0, percent: 15, label: 'Menunggu Rekomendasi RT' };
       case 'submitted':
         return { step: 1, percent: 25, label: 'Menunggu Pemeriksaan' };
       case 'in_verification':
@@ -117,6 +176,47 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter: pr
   const progress = getStepProgress();
 
   // Workflow Handlers: Menggerakkan alur tahapan secara instan otomatis di dalam modal
+  const handleManualRtApprove = async () => {
+    const updated = await updateRtApprovalStatus(letter.id, 'approved_by_rt', {
+      notes: 'Divalidasi manual oleh Admin/Petugas Kantor Desa (Rekomendasi RT Disetujui)',
+    });
+    if (updated) setLetter(updated);
+  };
+
+  const handleManualRtReject = async () => {
+    const reason = window.prompt('Masukkan alasan penolakan rekomendasi RT:') || 'Permohonan ditolak oleh Ketua RT / verifikasi kewilayahan tidak memenuhi syarat.';
+    const updated = await updateRtApprovalStatus(letter.id, 'rejected_by_rt', {
+      rejection_reason: reason,
+    });
+    if (updated) setLetter(updated);
+  };
+
+  const handleSendWaNotification = async () => {
+    setSendingWa(true);
+    setWaSuccessBanner(null);
+    try {
+      const leader = matchedLeader || getNeighborhoodLeader(resolvedRtNumber, resolvedRwNumber);
+      const targetLetter: LetterRequest = {
+        ...letter,
+        rt_number: resolvedRtNumber || letter.rt_number,
+        rw_number: resolvedRwNumber || letter.rw_number,
+        rt_leader_name: currentRtLeaderName,
+        rt_leader_phone: currentRtLeaderPhone,
+      };
+      const res = await wahaService.sendRtApprovalRequest(targetLetter, leader);
+      if (res.success) {
+        setWaSuccessBanner(`Pesan permohonan berhasil dikirim ke WhatsApp Ketua RT (${currentRtLeaderPhone || 'RT'})`);
+        setTimeout(() => setWaSuccessBanner(null), 7000);
+      } else {
+        alert(`Gagal mengirim WhatsApp: ${res.error || 'Server WAHA tidak merespon'}`);
+      }
+    } catch (err: any) {
+      alert(`Gagal: ${err.message}`);
+    } finally {
+      setSendingWa(false);
+    }
+  };
+
   const handleStartVerification = async () => {
     const updated = await updateLetterStatus(letter.id, 'in_verification');
     if (updated) setLetter(updated);
@@ -241,15 +341,19 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter: pr
                     ? 'bg-rose-50 text-rose-700 border-rose-200'
                     : letter.status === 'needs_revision'
                       ? 'bg-amber-50 text-amber-800 border-amber-200'
-                      : progress.percent === 100
-                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                        : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : letter.status === 'pending_rt'
+                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                        : progress.percent === 100
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : 'bg-emerald-50 text-emerald-800 border-emerald-200'
                 }`}>
                   {letter.status === 'rejected'
                     ? 'Pengajuan Ditolak'
                     : letter.status === 'needs_revision'
                       ? 'Perlu Revisi Warga'
-                      : `Tahap ${progress.step} dari 4 • ${progress.percent}% Selesai`}
+                      : letter.status === 'pending_rt'
+                        ? 'Tahap Awal • Menunggu Rekomendasi RT'
+                        : `Tahap ${progress.step} dari 4 • ${progress.percent}% Selesai`}
                 </span>
               </div>
 
@@ -420,6 +524,185 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter: pr
                 </div>
               </div>
             )}
+
+            {/* RT RECOMMENDATION BENTO SECTION */}
+            <div className={`p-4 sm:p-5 rounded-2xl border shadow-xs transition-all ${
+              letter.rt_status === 'approved_by_rt'
+                ? 'bg-emerald-50/50 border-emerald-200'
+                : letter.rt_status === 'rejected_by_rt'
+                  ? 'bg-rose-50/50 border-rose-200'
+                  : letter.rt_status === 'pending_rt' || letter.status === 'pending_rt'
+                    ? 'bg-purple-50/50 border-purple-200 ring-2 ring-purple-100'
+                    : 'bg-slate-50 border-slate-200'
+            }`}>
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200/70">
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                    letter.rt_status === 'approved_by_rt'
+                      ? 'bg-emerald-600 text-white'
+                      : letter.rt_status === 'rejected_by_rt'
+                        ? 'bg-rose-600 text-white'
+                        : 'bg-purple-600 text-white'
+                  }`}>
+                    <Building2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
+                      Rekomendasi / Pengantar Ketua RT
+                    </h3>
+                    <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium">
+                      <span>Kewilayahan:</span>
+                      <strong className="text-slate-800">
+                        RT {resolvedRtNumber || letter.rt_number || '-'} / RW {resolvedRwNumber || letter.rw_number || '-'}
+                      </strong>
+                      <button
+                        type="button"
+                        onClick={() => setIsChangingRt(!isChangingRt)}
+                        className="text-[10.5px] font-bold text-blue-600 hover:text-blue-800 underline ml-1 cursor-pointer"
+                      >
+                        {isChangingRt ? 'Tutup Pilihan' : 'Ubah / Hubungkan RT'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={sendingWa || !currentRtLeaderPhone}
+                    onClick={handleSendWaNotification}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all disabled:opacity-50"
+                    title={currentRtLeaderPhone ? `Kirim permohonan ke WhatsApp ${currentRtLeaderPhone}` : 'Pilih unit RT terlebih dahulu'}
+                  >
+                    <Phone className="w-3 h-3 text-white" />
+                    <span>{sendingWa ? 'Mengirim...' : 'Kirim WA ke RT'}</span>
+                  </button>
+
+                  {letter.rt_status === 'approved_by_rt' ? (
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                      Disetujui Ketua RT
+                    </span>
+                  ) : letter.rt_status === 'rejected_by_rt' ? (
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold px-3 py-1 rounded-full bg-rose-100 text-rose-800 border border-rose-300">
+                      <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                      Ditolak Ketua RT
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold px-3 py-1 rounded-full bg-purple-100 text-purple-800 border border-purple-300 animate-pulse">
+                      <Clock className="w-3.5 h-3.5 text-purple-600" />
+                      Menunggu Balasan RT (WAHA)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* DROPDOWN SELECTOR KETIKA ADMIN INGIN UBAH ATAU HUBUNGKAN RT */}
+              {isChangingRt && (
+                <div className="mt-3 p-3 bg-white rounded-xl border border-blue-200 shadow-xs space-y-2">
+                  <label className="text-[11px] font-bold text-slate-700 block">
+                    Pilih Wilayah RT Pemohon (Data dari Master RT Desa):
+                  </label>
+                  <select
+                    className="w-full text-xs font-semibold p-2 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-500"
+                    defaultValue=""
+                    onChange={(e) => handleSelectRtUnit(e.target.value)}
+                  >
+                    <option value="" disabled>-- Pilih RT / Ketua RT --</option>
+                    {neighborhoodUnits.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        RT {u.rt_number} / RW {u.rw_number} - {u.dusun_name || 'Dusun'} | Ketua: {u.rt_leader_name} ({u.rt_leader_phone || 'Tanpa WA'})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10.5px] text-slate-400">
+                    Memilih RT akan otomatis memperbarui nomor WhatsApp tujuan notifikasi WAHA dan menyimpannya ke surat ini.
+                  </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 text-xs">
+                <div>
+                  <span className="text-slate-400 text-[11px] block">Ketua RT:</span>
+                  <p className="font-bold text-slate-800">
+                    {currentRtLeaderName}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-slate-400 text-[11px] block">Nomor WhatsApp RT:</span>
+                  <p className="font-mono font-medium text-slate-800 flex items-center gap-1">
+                    <Phone className="w-3 h-3 text-emerald-600 shrink-0" />
+                    <span className={currentRtLeaderPhone ? 'text-slate-800 font-bold' : 'text-amber-600 font-semibold italic'}>
+                      {currentRtLeaderPhone || 'Belum diisi (Klik Ubah RT)'}
+                    </span>
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-slate-400 text-[11px] block">Status Respon:</span>
+                  <p className="font-medium text-slate-700">
+                    {letter.rt_approved_at ? (
+                      <span className="text-emerald-700 font-semibold">{letter.rt_approved_at}</span>
+                    ) : (letter.rt_status === 'pending_rt' || letter.status === 'pending_rt') ? (
+                      <span className="text-purple-800 font-semibold flex items-center gap-1">
+                        <MessageSquare className="w-3 h-3 text-purple-600" />
+                        Menunggu ketik "1" via WA
+                      </span>
+                    ) : (
+                      <span>-</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+                {waSuccessBanner && (
+                  <div className="mt-2.5 p-2.5 bg-emerald-100 border border-emerald-300 rounded-xl text-xs text-emerald-900 font-semibold flex items-center gap-2 animate-fade-in">
+                    <CheckCircle className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <span>{waSuccessBanner}</span>
+                  </div>
+                )}
+
+                {letter.rt_rejection_reason && (
+                  <div className="mt-2.5 p-2.5 bg-rose-100/70 border border-rose-200 rounded-xl text-xs text-rose-800">
+                    <strong>Alasan dari RT:</strong> {letter.rt_rejection_reason}
+                  </div>
+                )}
+                {letter.rt_notes && (
+                  <div className="mt-2.5 p-2.5 bg-slate-100 rounded-xl text-xs text-slate-700">
+                    <strong>Catatan RT:</strong> {letter.rt_notes}
+                  </div>
+                )}
+
+                {(letter.rt_status === 'pending_rt' || letter.status === 'pending_rt') && (
+                  <div className="mt-3.5 pt-3 border-t border-purple-200 flex flex-wrap items-center justify-between gap-2 bg-purple-100/50 -mx-4 sm:-mx-5 -mb-4 sm:-mb-5 p-3 sm:px-5 rounded-b-2xl">
+                    <div className="text-[11px] text-purple-900 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                      <span>
+                        Warga membawa surat fisik / ada konfirmasi langsung? Petugas desa dapat memvalidasi manual di sini:
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleManualRtReject}
+                        className="px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 border border-rose-300 rounded-xl transition-all"
+                      >
+                        Tolak atas Arahan RT
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleManualRtApprove}
+                        className="px-3.5 py-1.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-xs transition-all flex items-center gap-1.5"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Validasi Manual Rekomendasi RT</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
             {/* BENTO GRID: Data Pemohon & Keperluan */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -874,6 +1157,17 @@ export const LetterDetailModal: React.FC<LetterDetailModalProps> = ({ letter: pr
                   className="px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
                 >
                   Tolak Berkas
+                </button>
+              )}
+
+              {/* TAHAP RT -> TAHAP 1: Validasi Manual Rekomendasi RT */}
+              {letter.status === 'pending_rt' && (
+                <button
+                  onClick={handleManualRtApprove}
+                  className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-md shadow-purple-600/20 transition-all ring-2 ring-purple-300/30"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Validasi Manual Rekomendasi RT ➔</span>
                 </button>
               )}
 

@@ -7,14 +7,17 @@ import {
   initialEmergencyContacts,
   initialLetterRequests,
   initialVillageEvents,
-  initialVillageProfile
+  initialVillageProfile,
+  initialVillageOfficials
 } from '../data/mockData';
 import { QrVerifyModal } from '../components/QrVerifyModal';
 import { MobileDownloadModal } from '../components/MobileDownloadModal';
+import { useData } from '../hooks/useData';
 import {
   LandingNavbar,
   HeroSection,
   VillageProfileSection,
+  VillageOfficialsSection,
   LetterTrackingSection,
   PlatformShowcaseSection,
   ApbdesPublicSection,
@@ -30,15 +33,22 @@ interface LandingPageViewProps {
 }
 
 export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterAdmin }) => {
-  // Landing page 100% memakai data mock lokal (Desa Sukamaju).
-  // Data publik ini sengaja TIDAK disinkronkan dari Supabase agar identitas yang
-  // tampil ke publik selalu konsisten dan tidak terimbas data server demo.
-  const profile = initialVillageProfile;
+  const {
+    profile: currentProfile,
+    officials: currentOfficials,
+    announcements: currentAnnouncements,
+    apbdes: currentApbdes,
+    emergencyContacts: currentEmergencyContacts,
+    villageEvents: currentVillageEvents
+  } = useData();
+
+  const profile = currentProfile?.name ? currentProfile : initialVillageProfile;
+  const officials = currentOfficials && currentOfficials.length > 0 ? currentOfficials : initialVillageOfficials;
   const letters = initialLetterRequests;
-  const announcements = initialAnnouncements;
-  const apbdes = initialApbdes;
-  const emergencyContacts = initialEmergencyContacts;
-  const villageEvents = initialVillageEvents;
+  const announcements = currentAnnouncements && currentAnnouncements.length > 0 ? currentAnnouncements : initialAnnouncements;
+  const apbdes = currentApbdes?.fiscal_year ? currentApbdes : initialApbdes;
+  const emergencyContacts = currentEmergencyContacts && currentEmergencyContacts.length > 0 ? currentEmergencyContacts : initialEmergencyContacts;
+  const villageEvents = currentVillageEvents && currentVillageEvents.length > 0 ? currentVillageEvents : initialVillageEvents;
 
   // Modals state
   const [selectedQrLetter, setSelectedQrLetter] = useState<LetterRequest | null>(null);
@@ -62,7 +72,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterAdmin }
       {/* 3. Profil Desa / Kelurahan (Identitas & Visi Misi) */}
       <VillageProfileSection profile={profile} />
 
-      {/* 4. Interactive Letter Tracking Widget */}
+      {/* 4. Struktur Organisasi & Pamong Desa / Kelurahan */}
+      <VillageOfficialsSection officials={officials} profile={profile} />
+
+      {/* 5. Interactive Letter Tracking Widget */}
       <LetterTrackingSection
         letters={letters}
         profile={profile}

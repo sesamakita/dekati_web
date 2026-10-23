@@ -13,23 +13,42 @@ export interface VillageOfficial {
   nip?: string;
   nama_lengkap: string;
   email: string;
-  role: 'kades' | 'lurah' | 'sekdes' | 'kasi_layanan' | 'kaur_keuangan' | 'kaur_pembangunan' | 'satlinmas' | 'operator' | 'admin_desa';
+  role:
+    | 'kades'
+    | 'lurah'
+    | 'sekdes'
+    | 'kasi_layanan'
+    | 'kasi_pemerintahan'
+    | 'kasi_kesra'
+    | 'kaur_keuangan'
+    | 'kaur_pembangunan'
+    | 'kaur_perencanaan'
+    | 'kaur_tu_umum'
+    | 'kadus'
+    | 'satlinmas'
+    | 'operator'
+    | 'admin_desa'
+    | string;
+  jabatan?: string;
   village_id?: number;
   village_code: string;
   village_name: string;
   village_type?: VillageType;
   phone_number?: string;
+  whatsapp?: string;
   avatar_url?: string;
   can_sign_tte: boolean;
   status: 'active' | 'pending_approval' | 'suspended';
   last_login_at?: string;
   created_at?: string;
+  order_index?: number;
 }
 
 export type GenderType = 'L' | 'P';
 
 export type LetterStatus =
-  | 'submitted'        // Diajukan oleh warga
+  | 'pending_rt'       // Menunggu rekomendasi / verifikasi Ketua RT
+  | 'submitted'        // Diajukan oleh warga (siap verifikasi desa)
   | 'in_verification'  // Sedang diperiksa berkas oleh operator
   | 'needs_revision'   // Ada syarat yang kurang/salah
   | 'approved'         // Disetujui (siap TTE)
@@ -37,6 +56,8 @@ export type LetterStatus =
   | 'ready_for_pickup' // Siap diambil di balai desa
   | 'completed'        // Selesai
   | 'rejected';        // Ditolak
+
+export type RtApprovalStatus = 'not_required' | 'pending_rt' | 'approved_by_rt' | 'rejected_by_rt';
 
 export type ComplaintStatus =
   | 'submitted'    // Laporan baru masuk
@@ -91,6 +112,8 @@ export interface LetterType {
   estimated_days: number;
   icon: string;
   required_docs: string[];
+  requires_rt_approval?: boolean;
+  rt_guidelines?: string;
 }
 
 export interface LetterTimelineStep {
@@ -98,6 +121,21 @@ export interface LetterTimelineStep {
   time: string;
   done: boolean;
   actor?: string;
+}
+
+export interface NeighborhoodUnit {
+  id: string;
+  village_code: string;
+  dusun_name?: string;
+  rw_number: string;
+  rt_number: string;
+  rt_leader_name: string;
+  rt_leader_phone: string;
+  rw_leader_name?: string;
+  rw_leader_phone?: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface LetterRequest {
@@ -125,6 +163,15 @@ export interface LetterRequest {
   updated_at?: string;
   attachments?: { name: string; url: string; verified?: boolean }[];
   timeline: LetterTimelineStep[];
+  // RT Recommendation fields
+  rt_number?: string;
+  rw_number?: string;
+  rt_status?: RtApprovalStatus;
+  rt_leader_name?: string;
+  rt_leader_phone?: string;
+  rt_approved_at?: string;
+  rt_rejection_reason?: string;
+  rt_notes?: string;
 }
 
 export interface Complaint {

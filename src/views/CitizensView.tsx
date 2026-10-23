@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { CitizenVerifyModal } from '../components/CitizenVerifyModal';
+import { NeighborhoodUnitsManageModal } from '../components/NeighborhoodUnitsManageModal';
 import { Citizen } from '../types';
 import { resolveCitizenDocInfo } from '../services/docUtils';
 import {
@@ -40,6 +41,7 @@ export const CitizensView: React.FC = () => {
   const [selectedOccupation, setSelectedOccupation] = useState<string>('all');
   const [selectedCitizen, setSelectedCitizen] = useState<Citizen | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isRtModalOpen, setIsRtModalOpen] = useState(false);
 
   const unverifiedCount = citizens.filter((c) => !c.is_verified).length;
 
@@ -155,9 +157,19 @@ export const CitizensView: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <button
+            type="button"
+            onClick={() => setIsRtModalOpen(true)}
+            className="h-10 inline-flex items-center gap-1.5 px-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs text-xs font-bold transition-all hover:scale-105 active:scale-95 shrink-0"
+            title="Kelola Wilayah Rukun Tetangga (RT & RW) dan Kontak Ketua RT"
+          >
+            <Building className="w-4 h-4" />
+            <span>Kelola RT &amp; RW</span>
+          </button>
+
+          <button
             onClick={handleSync}
             disabled={isSyncing}
-            className="p-2.5 bg-white text-slate-700 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 rounded-xl border border-slate-200 shadow-sm transition-all disabled:opacity-50 flex items-center justify-center"
+            className="w-10 h-10 bg-white text-slate-700 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 rounded-xl border border-slate-200 shadow-sm transition-all disabled:opacity-50 flex items-center justify-center shrink-0"
             title="Segarkan Data (Muat data terbaru dari database)"
             aria-label="Segarkan Data"
           >
@@ -166,7 +178,7 @@ export const CitizensView: React.FC = () => {
 
           <button
             onClick={handleExportCsv}
-            className="p-2.5 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 rounded-xl border border-slate-200 shadow-sm transition-all flex items-center justify-center"
+            className="w-10 h-10 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 rounded-xl border border-slate-200 shadow-sm transition-all flex items-center justify-center shrink-0"
             title="Ekspor Buku Induk Kependudukan (CSV)"
             aria-label="Ekspor Buku Induk Kependudukan"
           >
@@ -175,7 +187,7 @@ export const CitizensView: React.FC = () => {
 
           <button
             onClick={handleExportOccupationCsv}
-            className="p-2.5 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 hover:border-emerald-300 rounded-xl border border-emerald-200 shadow-sm transition-all flex items-center justify-center"
+            className="w-10 h-10 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 hover:border-emerald-300 rounded-xl border border-emerald-200 shadow-sm transition-all flex items-center justify-center shrink-0"
             title="Ekspor Rekap Profesi & Monografi Warga (CSV Dinas)"
             aria-label="Ekspor Rekap Profesi"
           >
@@ -716,6 +728,12 @@ export const CitizensView: React.FC = () => {
           onClose={() => setSelectedCitizen(null)}
         />
       )}
+
+      {/* Modal Kelola RT & RW */}
+      <NeighborhoodUnitsManageModal
+        isOpen={isRtModalOpen}
+        onClose={() => setIsRtModalOpen(false)}
+      />
     </div>
   );
 };

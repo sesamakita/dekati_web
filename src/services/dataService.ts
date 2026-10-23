@@ -11,7 +11,9 @@ import {
   VillageOfficial,
   EmergencyContact,
   VillageEvent,
-  LetterTemplate
+  LetterTemplate,
+  NeighborhoodUnit,
+  RtApprovalStatus
 } from '../types';
 import {
   initialCitizens,
@@ -21,7 +23,9 @@ import {
   initialApbdes,
   initialVillageProfile,
   initialEmergencyContacts,
-  initialVillageEvents
+  initialVillageEvents,
+  initialNeighborhoodUnits,
+  initialVillageOfficials
 } from '../data/mockData';
 import { supabase } from './supabase';
 import { DEFAULT_TEMPLATES } from '../utils/letterTemplateEngine';
@@ -38,10 +42,11 @@ const STORAGE_KEYS = {
   EMERGENCY_CONTACTS: 'dekati_emergency_contacts_v1',
   VILLAGE_EVENTS: 'dekati_village_events_v1',
   OFFICIALS_LIST: 'dekati_officials_list_v1',
-  LETTER_TEMPLATES: 'dekati_letter_templates_v1'
+  LETTER_TEMPLATES: 'dekati_letter_templates_v1',
+  NEIGHBORHOOD_UNITS: 'dekati_neighborhood_units_v1'
 };
 
-export const defaultOfficials: VillageOfficial[] = [];
+export const defaultOfficials: VillageOfficial[] = initialVillageOfficials;
 
 type Listener = () => void;
 
@@ -120,7 +125,25 @@ class DataService {
         .order('created_at', { ascending: false });
 
       if (!letErr && Array.isArray(letData)) {
-        this.setStorage(STORAGE_KEYS.LETTERS, letData);
+        const enrichedLetters = letData.map((l: any) => {
+          let rt = l.rt_number;
+          let rw = l.rw_number;
+          if (!rt && l.citizen_address) {
+            const rtMatch = l.citizen_address.match(/RT\s*(\d+)/i);
+            const rwMatch = l.citizen_address.match(/RW\s*(\d+)/i);
+            if (rtMatch) rt = rtMatch[1].padStart(2, '0');
+            if (rwMatch) rw = rwMatch[1].padStart(2, '0');
+          }
+          const leader = this.getNeighborhoodLeader(rt, rw);
+          return {
+            ...l,
+            rt_number: rt || l.rt_number,
+            rw_number: rw || l.rw_number || (leader?.rw_number),
+            rt_leader_name: l.rt_leader_name || leader?.rt_leader_name,
+            rt_leader_phone: l.rt_leader_phone || leader?.rt_leader_phone,
+          };
+        });
+        this.setStorage(STORAGE_KEYS.LETTERS, enrichedLetters);
         this.isSupabaseConnected = true;
       }
 
@@ -269,14 +292,64 @@ class DataService {
       try {
         const { data: tmplData, error: tmplErr } = await supabase
           .from('letter_templates')
-          .select('*')
-          .eq('is_active', true);
+          .select('*');
 
         if (!tmplErr && Array.isArray(tmplData) && tmplData.length > 0) {
-          this.setStorage(STORAGE_KEYS.LETTER_TEMPLATES, tmplData);
+          const activeTemplates = tmplData.filter((t: any) => t.is_active !== false);
+          this.setStorage(STORAGE_KEYS.LETTER_TEMPLATES, activeTemplates.length > 0 ? activeTemplates : tmplData);
         }
       } catch (tmplFetchErr) {
         console.warn('[Dekati DataService] Failed to fetch letter_templates from Supabase:', tmplFetchErr);
+      }
+
+      // Check neighborhood_units
+      try {
+        const { data: nuData, error: nuErr } = await supabase
+          .from('neighborhood_units')
+          .select('*')
+          .order('rt_number', { ascending: true });
+
+        if (!nuErr && Array.isArray(nuData)) {
+          if (nuData.length > 0) {
+            const mapped = nuData.map((d: any) => ({
+              id: d.id,
+              village_code: d.village_code || '2102050003',
+              dusun_name: d.dusun_name || d.dusun || 'Dusun I',
+              rt_number: String(d.rt_number).padStart(2, '0'),
+              rw_number: String(d.rw_number).padStart(2, '0'),
+              rt_leader_name: d.rt_leader_name || '',
+              rt_leader_phone: d.rt_leader_phone || '',
+              rw_leader_name: d.rw_leader_name || undefined,
+              rw_leader_phone: d.rw_leader_phone || undefined,
+              is_active: d.is_active ?? true,
+              created_at: d.created_at,
+              updated_at: d.updated_at
+            }));
+            this.setStorage(STORAGE_KEYS.NEIGHBORHOOD_UNITS, mapped);
+          } else {
+            // Jika tabel di Supabase sudah ada namun masih kosong, sinkronkan data lokal admin ke Supabase
+            const localUnits = this.getNeighborhoodUnits();
+            if (localUnits.length > 0) {
+              const toUpsert = localUnits.map((u) => ({
+                id: u.id,
+                village_code: u.village_code || '2102050003',
+                dusun_name: u.dusun_name || 'Dusun I',
+                dusun: u.dusun_name || 'Dusun I',
+                rt_number: u.rt_number,
+                rw_number: u.rw_number,
+                rt_leader_name: u.rt_leader_name,
+                rt_leader_phone: u.rt_leader_phone,
+                rw_leader_name: u.rw_leader_name || null,
+                rw_leader_phone: u.rw_leader_phone || null,
+                is_active: u.is_active ?? true,
+                updated_at: new Date().toISOString()
+              }));
+              await supabase.from('neighborhood_units').upsert(toUpsert);
+            }
+          }
+        }
+      } catch (nuFetchErr) {
+        console.warn('[Dekati DataService] Failed to fetch neighborhood_units from Supabase:', nuFetchErr);
       }
 
       this.notify();
@@ -503,6 +576,13 @@ class DataService {
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'apbdes_items' },
+          () => {
+            this.syncFromSupabase();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'neighborhood_units' },
           () => {
             this.syncFromSupabase();
           }
@@ -882,6 +962,238 @@ class DataService {
       }
     } catch (e) {
       console.warn('Supabase letter update offline', e);
+    }
+
+    return letter;
+  }
+
+  getNeighborhoodUnits(): NeighborhoodUnit[] {
+    const list = this.getStorage<NeighborhoodUnit[]>(
+      STORAGE_KEYS.NEIGHBORHOOD_UNITS,
+      initialNeighborhoodUnits
+    );
+    if (!Array.isArray(list)) {
+      this.setStorage(STORAGE_KEYS.NEIGHBORHOOD_UNITS, initialNeighborhoodUnits);
+      return [...initialNeighborhoodUnits];
+    }
+    return list;
+  }
+
+  getNeighborhoodLeader(rt?: string, rw?: string): NeighborhoodUnit | undefined {
+    if (!rt) return undefined;
+    const cleanRt = rt.replace(/^0+/, '').trim();
+    const cleanRw = rw ? rw.replace(/^0+/, '').trim() : '';
+
+    return this.getNeighborhoodUnits().find((n) => {
+      const matchRt = n.rt_number.replace(/^0+/, '').trim() === cleanRt;
+      if (!cleanRw) return matchRt;
+      return matchRt && n.rw_number.replace(/^0+/, '').trim() === cleanRw;
+    });
+  }
+
+  saveNeighborhoodUnit(unit: NeighborhoodUnit): NeighborhoodUnit[] {
+    const list = this.getNeighborhoodUnits();
+    const idx = list.findIndex((u) => u.id === unit.id);
+    let updated: NeighborhoodUnit[];
+    if (idx >= 0) {
+      updated = list.map((item, i) => (i === idx ? { ...item, ...unit } : item));
+    } else {
+      updated = [...list, unit];
+    }
+    this.setStorage(STORAGE_KEYS.NEIGHBORHOOD_UNITS, updated);
+
+    (async () => {
+      try {
+        await supabase.from('neighborhood_units').upsert({
+          id: unit.id,
+          village_code: unit.village_code,
+          dusun_name: unit.dusun_name,
+          rt_number: unit.rt_number,
+          rw_number: unit.rw_number,
+          rt_leader_name: unit.rt_leader_name,
+          rt_leader_phone: unit.rt_leader_phone,
+          rw_leader_name: unit.rw_leader_name || null,
+          rw_leader_phone: unit.rw_leader_phone || null,
+          is_active: unit.is_active,
+          updated_at: new Date().toISOString()
+        });
+      } catch (err) {
+        console.warn('[Dekati DataService] Supabase neighborhood_units upsert offline:', err);
+      }
+    })();
+
+    return updated;
+  }
+
+  updateNeighborhoodUnit(id: string, updates: Partial<NeighborhoodUnit>): NeighborhoodUnit[] {
+    const list = this.getNeighborhoodUnits();
+    const updated = list.map((u) => (u.id === id ? { ...u, ...updates } : u));
+    this.setStorage(STORAGE_KEYS.NEIGHBORHOOD_UNITS, updated);
+
+    (async () => {
+      try {
+        await supabase
+          .from('neighborhood_units')
+          .update({
+            ...updates,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
+      } catch (err) {
+        console.warn('[Dekati DataService] Supabase neighborhood_units update offline:', err);
+      }
+    })();
+
+    return updated;
+  }
+
+  deleteNeighborhoodUnit(id: string): NeighborhoodUnit[] {
+    const list = this.getNeighborhoodUnits();
+    const updated = list.filter((u) => u.id !== id);
+    this.setStorage(STORAGE_KEYS.NEIGHBORHOOD_UNITS, updated);
+
+    (async () => {
+      try {
+        await supabase.from('neighborhood_units').delete().eq('id', id);
+      } catch (err) {
+        console.warn('[Dekati DataService] Supabase neighborhood_units delete offline:', err);
+      }
+    })();
+
+    return updated;
+  }
+
+  async updateRtApprovalStatus(
+    id: string,
+    rtStatus: RtApprovalStatus,
+    extra?: {
+      rt_leader_name?: string;
+      rt_leader_phone?: string;
+      rejection_reason?: string;
+      notes?: string;
+    }
+  ): Promise<LetterRequest | undefined> {
+    const letters = this.getLetters();
+    const index = letters.findIndex((l) => l.id === id || l.tracking_number === id);
+    if (index === -1) return undefined;
+
+    const letter = { ...letters[index] };
+    letter.rt_status = rtStatus;
+    letter.updated_at = new Date().toLocaleString('id-ID');
+
+    if (extra?.rt_leader_name) letter.rt_leader_name = extra.rt_leader_name;
+    if (extra?.rt_leader_phone) letter.rt_leader_phone = extra.rt_leader_phone;
+    if (extra?.rejection_reason) letter.rt_rejection_reason = extra.rejection_reason;
+    if (extra?.notes) letter.rt_notes = extra.notes;
+
+    const nowTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+    const existingTimeline = Array.isArray(letter.timeline) ? [...letter.timeline] : [];
+
+    const updateOrCreateStep = (matchKeyword: string, newStep: { title: string; time: string; done: boolean; actor?: string }) => {
+      const idx = existingTimeline.findIndex(s => s.title.toLowerCase().includes(matchKeyword.toLowerCase()));
+      if (idx !== -1) {
+        existingTimeline[idx] = { ...existingTimeline[idx], ...newStep };
+      } else {
+        existingTimeline.push(newStep);
+      }
+    };
+
+    if (rtStatus === 'approved_by_rt') {
+      letter.rt_approved_at = new Date().toLocaleString('id-ID');
+      // Bila status masih pending_rt, majukan ke submitted (siap verifikasi kantor desa)
+      if (letter.status === 'pending_rt') {
+        letter.status = 'submitted';
+      }
+      updateOrCreateStep('rekomendasi ketua rt', {
+        title: `Disetujui & Direkomendasikan Ketua RT ${letter.rt_number || ''}`,
+        time: nowTime,
+        done: true,
+        actor: letter.rt_leader_name || `Ketua RT ${letter.rt_number || ''}`
+      });
+    } else if (rtStatus === 'rejected_by_rt') {
+      letter.status = 'rejected';
+      letter.rejection_reason = extra?.rejection_reason || 'Permohonan ditolak oleh Ketua RT setempat.';
+      updateOrCreateStep('rekomendasi ketua rt', {
+        title: `Ditolak oleh Ketua RT ${letter.rt_number || ''}`,
+        time: nowTime,
+        done: true,
+        actor: letter.rt_leader_name || `Ketua RT ${letter.rt_number || ''}`
+      });
+    }
+
+    letter.timeline = existingTimeline;
+    letters[index] = letter;
+    this.setStorage(STORAGE_KEYS.LETTERS, letters);
+
+    // Sync to Supabase
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(letter.id);
+      let updateQuery = supabase
+        .from('letter_requests')
+        .update({
+          status: letter.status,
+          rt_status: letter.rt_status,
+          rt_approved_at: letter.rt_approved_at,
+          rt_rejection_reason: letter.rt_rejection_reason,
+          rejection_reason: letter.rejection_reason,
+          timeline: letter.timeline,
+          updated_at: new Date().toISOString()
+        });
+
+      if (isUuid) {
+        await updateQuery.or(`id.eq.${letter.id},tracking_number.eq.${letter.tracking_number}`);
+      } else {
+        await updateQuery.eq('tracking_number', letter.tracking_number);
+      }
+    } catch (e) {
+      console.warn('Supabase RT update offline', e);
+    }
+
+    return letter;
+  }
+
+  async assignLetterNeighborhoodUnit(
+    letterId: string,
+    unit: NeighborhoodUnit
+  ): Promise<LetterRequest | undefined> {
+    const letters = this.getLetters();
+    const index = letters.findIndex((l) => l.id === letterId || l.tracking_number === letterId);
+    if (index === -1) return undefined;
+
+    const letter = { ...letters[index] };
+    letter.rt_number = unit.rt_number;
+    letter.rw_number = unit.rw_number;
+    letter.rt_leader_name = unit.rt_leader_name;
+    letter.rt_leader_phone = unit.rt_leader_phone;
+    if (!letter.rt_status || letter.rt_status === 'not_required') {
+      letter.rt_status = 'pending_rt';
+    }
+    letter.updated_at = new Date().toLocaleString('id-ID');
+
+    letters[index] = letter;
+    this.setStorage(STORAGE_KEYS.LETTERS, letters);
+    this.notify();
+
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(letter.id);
+      let updateQuery = supabase
+        .from('letter_requests')
+        .update({
+          rt_number: unit.rt_number,
+          rw_number: unit.rw_number,
+          rt_leader_name: unit.rt_leader_name,
+          rt_leader_phone: unit.rt_leader_phone,
+          rt_status: letter.rt_status,
+          updated_at: new Date().toISOString()
+        });
+
+      if (isUuid) {
+        await updateQuery.or(`id.eq.${letter.id},tracking_number.eq.${letter.tracking_number}`);
+      } else {
+        await updateQuery.eq('tracking_number', letter.tracking_number);
+      }
+    } catch (e) {
+      console.warn('Supabase assignLetterNeighborhoodUnit offline:', e);
     }
 
     return letter;
@@ -1694,6 +2006,73 @@ class DataService {
     this.notify();
   }
 
+  // Village Officials Management
+  getOfficials(): VillageOfficial[] {
+    const list = this.getStorage<VillageOfficial[]>(
+      STORAGE_KEYS.OFFICIALS_LIST,
+      initialVillageOfficials
+    );
+    if (!Array.isArray(list)) {
+      this.setStorage(STORAGE_KEYS.OFFICIALS_LIST, initialVillageOfficials);
+      return [...initialVillageOfficials];
+    }
+    return list;
+  }
+
+  saveOfficial(official: VillageOfficial): VillageOfficial[] {
+    const list = this.getOfficials();
+    const idx = list.findIndex((o) => o.id === official.id);
+    let updated: VillageOfficial[];
+    if (idx >= 0) {
+      updated = list.map((item, i) => (i === idx ? { ...item, ...official } : item));
+    } else {
+      updated = [...list, official];
+    }
+    this.setStorage(STORAGE_KEYS.OFFICIALS_LIST, updated);
+
+    (async () => {
+      try {
+        await supabase.from('village_officials').upsert(official);
+      } catch (err) {
+        console.warn('[Dekati DataService] Supabase official upsert offline:', err);
+      }
+    })();
+
+    return updated;
+  }
+
+  updateOfficial(id: string, updates: Partial<VillageOfficial>): VillageOfficial[] {
+    const list = this.getOfficials();
+    const updated = list.map((o) => (o.id === id ? { ...o, ...updates } : o));
+    this.setStorage(STORAGE_KEYS.OFFICIALS_LIST, updated);
+
+    (async () => {
+      try {
+        await supabase.from('village_officials').update(updates).eq('id', id);
+      } catch (err) {
+        console.warn('[Dekati DataService] Supabase official update offline:', err);
+      }
+    })();
+
+    return updated;
+  }
+
+  deleteOfficial(id: string): VillageOfficial[] {
+    const list = this.getOfficials();
+    const updated = list.filter((o) => o.id !== id);
+    this.setStorage(STORAGE_KEYS.OFFICIALS_LIST, updated);
+
+    (async () => {
+      try {
+        await supabase.from('village_officials').delete().eq('id', id);
+      } catch (err) {
+        console.warn('[Dekati DataService] Supabase official delete offline:', err);
+      }
+    })();
+
+    return updated;
+  }
+
   // Reset to initial mock data
   resetAllData() {
     this.cache = {};
@@ -1707,6 +2086,7 @@ class DataService {
     localStorage.removeItem(STORAGE_KEYS.EMERGENCY_CONTACTS);
     localStorage.removeItem(STORAGE_KEYS.VILLAGE_EVENTS);
     localStorage.removeItem(STORAGE_KEYS.OFFICIALS_LIST);
+    this.setStorage(STORAGE_KEYS.OFFICIALS_LIST, initialVillageOfficials);
     this.syncFromSupabase();
     this.notify();
   }

@@ -17,18 +17,27 @@ import {
   Trash2,
   Calendar,
   Layers,
-  Save
+  Save,
+  Users,
+  MessageCircle
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { VillageProfileModal } from '../components/VillageProfileModal';
 import { ApbdesManageModal } from '../components/ApbdesManageModal';
+import { VillageOfficialsManageModal } from '../components/VillageOfficialsManageModal';
+import { NeighborhoodUnitsManageModal } from '../components/NeighborhoodUnitsManageModal';
+import { VillageOfficial } from '../types';
 
 export const ApbdesView: React.FC = () => {
-  const { apbdes, profile, deleteApbdesItem } = useData();
+  const { apbdes, profile, officials, deleteApbdesItem, deleteOfficial } = useData();
 
   // Modals state
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isApbdesModalOpen, setIsApbdesModalOpen] = useState(false);
+  const [isOfficialsModalOpen, setIsOfficialsModalOpen] = useState(false);
+  const [isRtModalOpen, setIsRtModalOpen] = useState(false);
+  const [isAddOfficialMode, setIsAddOfficialMode] = useState(false);
+  const [selectedOfficialForEdit, setSelectedOfficialForEdit] = useState<VillageOfficial | null>(null);
   const [apbdesModalTab, setApbdesModalTab] = useState<'pendapatan' | 'belanja'>('pendapatan');
 
   const openApbdesPortal = (tab: 'pendapatan' | 'belanja' = 'pendapatan') => {
@@ -478,6 +487,172 @@ export const ApbdesView: React.FC = () => {
         </div>
       </div>
 
+      {/* Struktur Organisasi & Pamong Desa / Kelurahan Bento Card */}
+      <div className="bento-card p-6 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-teal-600 flex items-center justify-center text-white shadow-md shadow-teal-600/20">
+              <Users className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <span>Struktur Organisasi &amp; Pamong {profile.name || 'Desa'}</span>
+                <span className="text-[10px] bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full font-bold">
+                  {officials.length} Pamong Terdata
+                </span>
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                Daftar aparatur perangkat desa dan nomor kontak WhatsApp resmi untuk koordinasi pelayanan warga
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedOfficialForEdit(null);
+                setIsAddOfficialMode(true);
+                setIsOfficialsModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs hover:scale-105 active:scale-95"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Tambah Pamong</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedOfficialForEdit(null);
+                setIsAddOfficialMode(false);
+                setIsOfficialsModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Susunan Lengkap</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsRtModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-xs font-bold transition-colors"
+            >
+              <Building2 className="w-3.5 h-3.5 text-blue-600" />
+              <span>Wilayah RT &amp; RW</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Grid Aparatur Pamong */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+          {officials.map((official) => {
+            const rawPhone = official.whatsapp || official.phone_number || '';
+            let waClean = rawPhone.replace(/[^0-9]/g, '');
+            if (waClean.startsWith('0')) waClean = '62' + waClean.slice(1);
+            else if (!waClean.startsWith('62') && waClean.length > 0) waClean = '62' + waClean;
+            const waUrl = waClean
+              ? `https://wa.me/${waClean}?text=${encodeURIComponent(
+                  `Halo Bpk/Ibu ${official.nama_lengkap} (${official.jabatan || 'Pamong Desa'}), saya koordinasi dari portal admin ${profile.name}.`
+                )}`
+              : null;
+
+            return (
+              <div
+                key={official.id}
+                className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 hover:border-emerald-300 hover:bg-emerald-50/20 transition-all flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center font-bold text-emerald-700 shadow-xs">
+                        {official.avatar_url ? (
+                          <img src={official.avatar_url} alt={official.nama_lengkap} className="w-full h-full object-cover" />
+                        ) : (
+                          official.nama_lengkap.charAt(0)
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md truncate max-w-full">
+                          {official.jabatan || official.role}
+                        </span>
+                        <h4 className="font-bold text-slate-900 text-sm truncate mt-0.5">
+                          {official.nama_lengkap}
+                        </h4>
+                        {official.nip && (
+                          <p className="text-[10.5px] text-slate-400 font-mono">NIP: {official.nip}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Quick Action: Edit & Hapus Pamong */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedOfficialForEdit(official);
+                          setIsAddOfficialMode(false);
+                          setIsOfficialsModalOpen(true);
+                        }}
+                        className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition-colors"
+                        title="Edit Data Pamong"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `Apakah Anda yakin ingin menghapus pamong "${official.nama_lengkap}" (${official.jabatan || official.role}) dari susunan organisasi desa?`
+                            )
+                          ) {
+                            deleteOfficial(official.id);
+                          }
+                        }}
+                        className="p-1.5 rounded-lg bg-white border border-slate-200 text-rose-500 hover:text-rose-700 hover:bg-rose-50 hover:border-rose-300 transition-colors"
+                        title="Hapus Pamong"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400 font-medium">No. WhatsApp:</span>
+                    <span className="font-mono font-bold text-slate-700">
+                      {official.whatsapp || official.phone_number || '-'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-2.5 border-t border-slate-200/60 flex items-center gap-2">
+                  {official.phone_number && (
+                    <a
+                      href={`tel:${official.phone_number.replace(/[^0-9]/g, '')}`}
+                      className="flex-1 py-1.5 px-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold text-[11px] text-center flex items-center justify-center gap-1 hover:bg-slate-100 transition-colors"
+                    >
+                      <Phone className="w-3 h-3 text-slate-500" />
+                      Telepon
+                    </a>
+                  )}
+                  {waUrl && (
+                    <a
+                      href={waUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] text-center flex items-center justify-center gap-1 shadow-xs transition-colors"
+                    >
+                      <MessageCircle className="w-3 h-3 fill-current" />
+                      Chat WhatsApp
+                    </a>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Modal 1: Portal Kelola APBDes Lengkap */}
       <ApbdesManageModal
         isOpen={isApbdesModalOpen}
@@ -489,6 +664,24 @@ export const ApbdesView: React.FC = () => {
       <VillageProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
+      />
+
+      {/* Modal 3: Pengelola Struktur Organisasi & Pamong (Tambah, Edit, Hapus) */}
+      <VillageOfficialsManageModal
+        isOpen={isOfficialsModalOpen}
+        onClose={() => {
+          setIsOfficialsModalOpen(false);
+          setSelectedOfficialForEdit(null);
+          setIsAddOfficialMode(false);
+        }}
+        initialAddMode={isAddOfficialMode}
+        initialEditOfficial={selectedOfficialForEdit}
+      />
+
+      {/* Modal 4: Pengelola Wilayah RT & RW (Tambah, Edit, Hapus) */}
+      <NeighborhoodUnitsManageModal
+        isOpen={isRtModalOpen}
+        onClose={() => setIsRtModalOpen(false)}
       />
     </div>
   );

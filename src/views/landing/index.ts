@@ -2,6 +2,7 @@
 export * from './LandingNavbar';
 export * from './HeroSection';
 export * from './VillageProfileSection';
+export * from './VillageOfficialsSection';
 export * from './LetterTrackingSection';
 export * from './PlatformShowcaseSection';
 export * from './ApbdesPublicSection';

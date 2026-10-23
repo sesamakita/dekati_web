@@ -48,6 +48,7 @@ export const LettersView: React.FC = () => {
 
   const filterTabs: { id: 'all' | LetterStatus; label: string; count: number }[] = [
     { id: 'all', label: 'Semua Permohonan', count: letters.length },
+    { id: 'pending_rt', label: 'Menunggu Rekomendasi RT', count: letters.filter((l) => l.status === 'pending_rt').length },
     { id: 'submitted', label: 'Menunggu Verifikasi', count: letters.filter((l) => l.status === 'submitted').length },
     { id: 'in_verification', label: 'Pemeriksaan Berkas', count: letters.filter((l) => l.status === 'in_verification').length },
     { id: 'approved', label: 'Siap TTE Kades', count: letters.filter((l) => l.status === 'approved').length },
@@ -169,8 +170,13 @@ export const LettersView: React.FC = () => {
                         </div>
                       )}
                     </td>
-                    <td className="py-4 px-4 font-bold text-slate-800">
-                      {letter.letter_name}
+                    <td className="py-4 px-4">
+                      <div className="font-bold text-slate-800">{letter.letter_name}</div>
+                      {letter.rt_number && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 mt-1">
+                          RT {letter.rt_number} / RW {letter.rw_number || '-'}
+                        </span>
+                      )}
                     </td>
                     <td className="py-4 px-4">
                       <div className="font-bold text-slate-900">{letter.citizen_name}</div>

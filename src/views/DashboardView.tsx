@@ -42,8 +42,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
 
   // Metrics
   const pendingLetters = letters.filter(
-    (l) => l.status === 'submitted' || l.status === 'in_verification'
+    (l) => l.status === 'submitted' || l.status === 'in_verification' || l.status === 'pending_rt'
   );
+  const pendingRtLetters = letters.filter((l) => l.status === 'pending_rt');
   const readyToSignLetters = letters.filter((l) => l.status === 'approved');
   const activeComplaints = complaints.filter(
     (c) => c.status === 'submitted' || c.status === 'in_progress'
@@ -151,7 +152,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-2 flex items-center justify-between">
-            <span>{readyToSignLetters.length} siap TTE Kades</span>
+            <span>{pendingRtLetters.length > 0 ? `${pendingRtLetters.length} via RT • ` : ''}{readyToSignLetters.length} siap TTE</span>
             <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-600 transition-colors" />
           </p>
         </div>

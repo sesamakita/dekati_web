@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import {
   X,
   Building2,
+  Building,
   Save,
   CheckCircle2,
   MapPin,
@@ -19,7 +20,12 @@ import {
   Image,
   RotateCcw,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  Users,
+  MessageCircle,
+  ChevronRight,
+  Edit3,
+  Plus
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { DEFAULT_DESA_LOGO_DATA_URI, DEFAULT_KAB_LOGO_DATA_URI } from '../utils/letterTemplateEngine';
@@ -32,7 +38,9 @@ import {
   toTitleCase,
   detectVillageType
 } from '../services/wilayahService';
-import { VillageType } from '../types';
+import { VillageType, VillageOfficial } from '../types';
+import { VillageOfficialsManageModal } from './VillageOfficialsManageModal';
+import { NeighborhoodUnitsManageModal } from './NeighborhoodUnitsManageModal';
 
 interface VillageProfileModalProps {
   isOpen: boolean;
@@ -40,7 +48,12 @@ interface VillageProfileModalProps {
 }
 
 export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen, onClose }) => {
-  const { profile, updateVillageProfile } = useData();
+  const { profile, updateVillageProfile, officials, updateOfficial, deleteOfficial, neighborhoodUnits } = useData();
+
+  const [isFullOfficialsModalOpen, setIsFullOfficialsModalOpen] = useState(false);
+  const [profileEditingOfficial, setProfileEditingOfficial] = useState<VillageOfficial | null>(null);
+  const [isAddOfficialFromProfile, setIsAddOfficialFromProfile] = useState(false);
+  const [isRtModalOpen, setIsRtModalOpen] = useState(false);
 
   // Local form states
   const [name, setName] = useState(profile.name || '');
@@ -65,6 +78,7 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
   const [logoDesaUrl, setLogoDesaUrl] = useState(profile.logo_desa_url || '');
   const [logoKabupatenUrl, setLogoKabupatenUrl] = useState(profile.logo_kabupaten_url || '');
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [officialsList, setOfficialsList] = useState(officials);
 
   const desaFileInputRef = useRef<HTMLInputElement>(null);
   const kabFileInputRef = useRef<HTMLInputElement>(null);
@@ -139,10 +153,11 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
       setMission(profile.mission && profile.mission.length > 0 ? [...profile.mission] : ['']);
       setLogoDesaUrl(profile.logo_desa_url || '');
       setLogoKabupatenUrl(profile.logo_kabupaten_url || '');
+      setOfficialsList(officials);
       setUploadError(null);
       setSaveSuccess(false);
     }
-  }, [isOpen, profile]);
+  }, [isOpen, profile, officials]);
 
   // Load provinces on picker active
   useEffect(() => {
@@ -286,6 +301,27 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
         logo_desa_url: logoDesaUrl,
         logo_kabupaten_url: logoKabupatenUrl,
       });
+
+      // Update officials WhatsApp and roles safely for existing officials
+      for (const off of officialsList) {
+        const stillExists = officials.some((o) => o.id === off.id);
+        if (stillExists) {
+          await updateOfficial(off.id, {
+            whatsapp: off.whatsapp,
+            phone_number: off.whatsapp || off.phone_number,
+            nama_lengkap:
+              off.role === 'kades' || off.role === 'lurah'
+                ? kadesName || off.nama_lengkap
+                : off.role === 'sekdes'
+                ? sekdesName || off.nama_lengkap
+                : off.nama_lengkap,
+            nip:
+              off.role === 'kades' || off.role === 'lurah'
+                ? kadesNip || off.nip
+                : off.nip,
+          });
+        }
+      }
 
       setSaveSuccess(true);
       setTimeout(() => {
@@ -877,12 +913,190 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
             </div>
           </div>
 
+          {/* E. Daftar Aparatur & Kontak WhatsApp Pamong */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-2">
+              <div className="flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-emerald-600" />
+                <span className="text-sm font-bold text-slate-900">Kontak WhatsApp Aparatur &amp; Pamong Desa</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileEditingOfficial(null);
+                    setIsAddOfficialFromProfile(true);
+                    setIsFullOfficialsModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all hover:scale-105 active:scale-95"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Tambah Pamong</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileEditingOfficial(null);
+                    setIsAddOfficialFromProfile(false);
+                    setIsFullOfficialsModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200/80 transition-colors"
+                >
+                  <span>Kelola Lengkap</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-emerald-600" />
+                </button>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-500">
+              Nomor WhatsApp di bawah ini akan tampil secara publik di halaman portal web desa agar masyarakat dapat berkonsultasi secara langsung.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-72 overflow-y-auto p-1">
+              {officialsList.map((official) => (
+                <div
+                  key={official.id}
+                  className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2 text-xs"
+                >
+                  <div className="flex items-center justify-between gap-1.5">
+                    <div className="min-w-0 flex items-center gap-1.5 flex-1">
+                      <span className="font-bold text-slate-800 text-[11px] truncate">
+                        {official.nama_lengkap}
+                      </span>
+                      <span className="text-[9.5px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded shrink-0">
+                        {official.jabatan || official.role}
+                      </span>
+                    </div>
+
+                    {/* Quick Edit & Delete inside Section E */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileEditingOfficial(official);
+                          setIsAddOfficialFromProfile(false);
+                          setIsFullOfficialsModalOpen(true);
+                        }}
+                        className="p-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition-colors"
+                        title="Edit Data Pamong"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (
+                            window.confirm(
+                              `Apakah Anda yakin ingin menghapus pamong "${official.nama_lengkap}" (${official.jabatan || official.role}) dari struktur desa?`
+                            )
+                          ) {
+                            await deleteOfficial(official.id);
+                            setOfficialsList((prev) => prev.filter((o) => o.id !== official.id));
+                          }
+                        }}
+                        className="p-1 rounded-lg bg-white border border-slate-200 text-rose-500 hover:text-rose-700 hover:bg-rose-50 hover:border-rose-300 transition-colors"
+                        title="Hapus Pamong"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 font-semibold block">
+                      Nomor WhatsApp:
+                    </label>
+                    <div className="relative">
+                      <MessageCircle className="w-3.5 h-3.5 text-emerald-600 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={official.whatsapp || official.phone_number || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setOfficialsList((prev) =>
+                            prev.map((item) =>
+                              item.id === official.id
+                                ? { ...item, whatsapp: val, phone_number: val }
+                                : item
+                            )
+                          );
+                        }}
+                        placeholder="Contoh: 081234567801"
+                        className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* F. Wilayah Rukun Tetangga (RT & RW) & Kontak Ketua RT */}
+          <div className="space-y-3 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 flex-wrap gap-2">
+              <div className="flex items-center gap-1.5">
+                <Building className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-bold text-slate-900">Wilayah Rukun Tetangga (RT &amp; RW) &amp; Ketua RT</span>
+                <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full ml-1">
+                  {neighborhoodUnits.length} RT
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRtModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold border border-blue-200 transition-colors"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-blue-600" />
+                <span>Kelola Data RT &amp; RW</span>
+              </button>
+            </div>
+
+            <p className="text-[11px] text-slate-500">
+              Daftar RT di bawah ini tersinkron secara online ke menu Kontak Darurat &amp; Siaga Wilayah pada aplikasi mobile warga.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto p-1">
+              {neighborhoodUnits.map((unit) => (
+                <div
+                  key={unit.id}
+                  className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between text-xs"
+                >
+                  <div className="min-w-0 pr-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-900 font-extrabold text-[11px]">
+                        RT {unit.rt_number} / RW {unit.rw_number}
+                      </span>
+                      {unit.dusun_name && (
+                        <span className="text-[10px] text-slate-500 truncate">{unit.dusun_name}</span>
+                      )}
+                    </div>
+                    <div className="font-bold text-slate-800 text-xs mt-1 truncate">
+                      {unit.rt_leader_name}
+                    </div>
+                    <div className="text-[10.5px] text-emerald-700 font-mono font-medium">
+                      WA: {unit.rt_leader_phone || '-'}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsRtModalOpen(true)}
+                    className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-colors shrink-0"
+                    title="Ubah Data RT"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Footer Submit */}
           <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
             {saveSuccess ? (
               <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>Profil Desa Berhasil Disimpan & Sinkron!</span>
+                <span>Profil Desa Berhasil Disimpan &amp; Sinkron!</span>
               </div>
             ) : (
               <span className="text-[11px] text-slate-400">
@@ -910,6 +1124,22 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
           </div>
         </form>
       </div>
+
+      <VillageOfficialsManageModal
+        isOpen={isFullOfficialsModalOpen}
+        onClose={() => {
+          setIsFullOfficialsModalOpen(false);
+          setProfileEditingOfficial(null);
+          setIsAddOfficialFromProfile(false);
+        }}
+        initialAddMode={isAddOfficialFromProfile}
+        initialEditOfficial={profileEditingOfficial}
+      />
+
+      <NeighborhoodUnitsManageModal
+        isOpen={isRtModalOpen}
+        onClose={() => setIsRtModalOpen(false)}
+      />
     </div>,
     document.body
   );
