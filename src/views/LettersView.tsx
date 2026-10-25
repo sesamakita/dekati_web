@@ -12,7 +12,8 @@ import {
   ShieldCheck, 
   XCircle,
   Eye,
-  Settings2
+  Settings2,
+  Download
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { LetterStatusBadge } from '../components/StatusBadge';
@@ -21,6 +22,7 @@ import { LetterPrintModal } from '../components/LetterPrintModal';
 import { QrVerifyModal } from '../components/QrVerifyModal';
 import { LetterTemplateModal } from '../components/LetterTemplateModal';
 import { LetterRequest, LetterStatus } from '../types';
+import { MaskedNik } from '../components/MaskedNik';
 
 export const LettersView: React.FC = () => {
   const { letters, profile, letterTemplates, saveLetterTemplate, resetLetterTemplate } = useData();
@@ -56,6 +58,27 @@ export const LettersView: React.FC = () => {
     { id: 'rejected', label: 'Ditolak', count: letters.filter((l) => l.status === 'rejected').length },
   ];
 
+  const handleExportRegisterCsv = () => {
+    const headers = 'No_Registrasi,No_Pelacakan,Nama_Pemohon,NIK,Jenis_Surat,Keperluan,Status,Rekomendasi_RT,Tgl_Pengajuan,Pejabat_TTE,Tgl_TTE\n';
+    const rows = filteredLetters
+      .map((l) => {
+        const dateCreated = l.created_at ? new Date(l.created_at).toLocaleDateString('id-ID') : '-';
+        const dateSigned = l.signed_at ? new Date(l.signed_at).toLocaleDateString('id-ID') : '-';
+        return `"${l.letter_official_number || '-'}","${l.tracking_number}","${(l.citizen_name || '').replace(/"/g, '""')}","\t${l.citizen_nik}","${l.letter_name}","${(l.purpose || '').replace(/"/g, '""')}","${l.status}","${l.rt_status || '-'}","${dateCreated}","${(l.signed_by_name || '-').replace(/"/g, '""')}","${dateSigned}"`;
+      })
+      .join('\n');
+
+    const blob = new Blob(['\uFEFF' + headers + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `buku_register_surat_${(profile?.name || 'Desa').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6 pb-12 animate-fade-in">
       {/* Title & Stats */}
@@ -69,13 +92,23 @@ export const LettersView: React.FC = () => {
             Verifikasi berkas persyaratan permohonan surat warga, penerbitan nomor registrasi desa, dan pengesahan TTE QR Code.
           </p>
         </div>
-        <button
-          onClick={() => setShowTemplateModal(true)}
-          className="flex items-center gap-2 px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-emerald-300 text-slate-700 hover:text-emerald-800 text-xs font-bold rounded-xl shadow-sm transition-all shrink-0"
-        >
-          <Settings2 className="w-4 h-4 text-emerald-600" />
-          <span>Tata Naskah & Template Surat</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={handleExportRegisterCsv}
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/90 text-emerald-800 text-xs font-bold rounded-xl shadow-sm transition-all shrink-0 cursor-pointer"
+            title="Unduh Buku Register Surat Resmi dalam format Excel/CSV"
+          >
+            <Download className="w-4 h-4 text-emerald-700" />
+            <span>Ekspor Buku Register</span>
+          </button>
+          <button
+            onClick={() => setShowTemplateModal(true)}
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-emerald-300 text-slate-700 hover:text-emerald-800 text-xs font-bold rounded-xl shadow-sm transition-all shrink-0"
+          >
+            <Settings2 className="w-4 h-4 text-emerald-600" />
+            <span>Tata Naskah & Template Surat</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter Tabs (Horizontal Pill Bar) */}
@@ -147,11 +180,11 @@ export const LettersView: React.FC = () => {
               <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200/80">
                 <tr>
                   <th className="py-3.5 px-5">No. Tracking / Surat</th>
-                  <th className="py-3.5 px-4">Jenis Surat</th>
+                  <th className="py-3.5 px-4 min-w-[160px] max-w-[180px]">Jenis Surat</th>
                   <th className="py-3.5 px-4">Nama Pemohon & NIK</th>
-                  <th className="py-3.5 px-4">Keperluan</th>
+                  <th className="py-3.5 px-4 max-w-[180px]">Keperluan</th>
                   <th className="py-3.5 px-4">Waktu Pengajuan</th>
-                  <th className="py-3.5 px-4">Status</th>
+                  <th className="py-3.5 px-4 min-w-[135px] max-w-[155px]">Status</th>
                   <th className="py-3.5 px-5 text-right">Aksi</th>
                 </tr>
               </thead>
@@ -170,25 +203,31 @@ export const LettersView: React.FC = () => {
                         </div>
                       )}
                     </td>
-                    <td className="py-4 px-4">
-                      <div className="font-bold text-slate-800">{letter.letter_name}</div>
+                    <td className="py-4 px-4 min-w-[160px] max-w-[180px]">
+                      <div className="font-bold text-slate-800 truncate" title={letter.letter_name}>
+                        {letter.letter_name}
+                      </div>
                       {letter.rt_number && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200 mt-1">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 mt-1 whitespace-nowrap">
                           RT {letter.rt_number} / RW {letter.rw_number || '-'}
                         </span>
                       )}
                     </td>
                     <td className="py-4 px-4">
                       <div className="font-bold text-slate-900">{letter.citizen_name}</div>
-                      <div className="font-mono text-slate-400 text-[11px]">{letter.citizen_nik}</div>
+                      <div className="text-[11px] text-slate-500">
+                        <MaskedNik nik={letter.citizen_nik} />
+                      </div>
                     </td>
-                    <td className="py-4 px-4 text-slate-600 max-w-xs truncate">
-                      {letter.purpose}
+                    <td className="py-4 px-4 text-slate-600 max-w-[180px]">
+                      <div className="line-clamp-2 leading-snug" title={letter.purpose}>
+                        {letter.purpose}
+                      </div>
                     </td>
                     <td className="py-4 px-4 text-slate-500">
                       {letter.created_at}
                     </td>
-                    <td className="py-4 px-4">
+                    <td className="py-4 px-4 min-w-[135px] max-w-[155px]">
                       <LetterStatusBadge status={letter.status} />
                     </td>
                     <td className="py-4 px-5 text-right" onClick={(e) => e.stopPropagation()}>

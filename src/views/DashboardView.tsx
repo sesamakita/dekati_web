@@ -24,16 +24,18 @@ import { LetterDetailModal } from '../components/LetterDetailModal';
 import { ComplaintDetailModal } from '../components/ComplaintDetailModal';
 import { CitizenVerifyModal } from '../components/CitizenVerifyModal';
 import { NewAnnouncementModal } from '../components/NewAnnouncementModal';
+import { OnboardingGuideCard } from '../components/OnboardingGuideCard';
 import { NavTab } from '../components/Sidebar';
 import { LetterRequest, Complaint, Citizen } from '../types';
 import { aggregateOccupations } from '../services/occupationUtils';
+import { MaskedNik } from '../components/MaskedNik';
 
 interface DashboardViewProps {
   onNavigateTab: (tab: NavTab) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) => {
-  const { letters, complaints, citizens, apbdes, profile, activeRole, villageEvents, emergencyContacts } = useData();
+  const { letters, complaints, citizens, apbdes, profile, activeRole, currentOfficial, villageEvents, emergencyContacts } = useData();
 
   const [selectedLetter, setSelectedLetter] = useState<LetterRequest | null>(null);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
@@ -54,11 +56,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in">
-      {/* Welcome Banner Bento Card */}
-      <div className="bento-card p-6 sm:p-7 bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white relative overflow-visible">
-        {/* Background Decorative Skew Shape (Safely clipped inside its own container) */}
+      {/* Welcome Banner Bento Card with Holographic Border */}
+      <div className="bento-card-hero-holo p-6 sm:p-7 text-white relative overflow-visible group/hero">
+        {/* Background Decorative Skew Shape & Holographic Shimmer Sweep */}
         <div className="absolute inset-0 overflow-hidden rounded-2xl sm:rounded-3xl pointer-events-none">
           <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-white/5 skew-x-12"></div>
+          <div className="absolute inset-0 holo-shimmer-sweep opacity-35 group-hover/hero:opacity-80 transition-opacity"></div>
         </div>
 
         {/* Right side emblem/logo preview in banner */}
@@ -81,7 +84,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
             Portal Administrasi Desa Terpadu • Sistem DEKATI
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Selamat Bertugas, {activeRole === 'kades' ? (profile.kades_name || 'Kepala Desa') : (profile.sekdes_name || 'Aparatur Desa')} 👋
+            Selamat Bertugas, {currentOfficial ? currentOfficial.nama_lengkap : (activeRole === 'kades' ? (profile.kades_name || 'Kepala Desa') : (profile.sekdes_name || 'Aparatur Desa'))} 👋
           </h1>
           <p className="text-sm text-emerald-100/90 mt-2 leading-relaxed">
             Kelola permohonan surat warga, tanggapi laporan aduan fasilitas desa, dan pantau transparansi APBDes {profile.name} secara real-time.
@@ -127,6 +130,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
           </div>
         </div>
       </div>
+
+      {/* Onboarding Setup Guide Checklist for Administrators */}
+      <OnboardingGuideCard onNavigateTab={onNavigateTab} />
 
       {/* Top 4 Bento Metric Cards (Airy & Spacious) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -294,8 +300,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                             ({letter.tracking_number})
                           </span>
                         </div>
-                        <div className="text-xs text-slate-500 mt-0.5">
-                          Pemohon: <span className="font-semibold text-slate-700">{letter.citizen_name}</span> • NIK: {letter.citizen_nik}
+                        <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          <span>Pemohon: <span className="font-semibold text-slate-700">{letter.citizen_name}</span></span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1">
+                            NIK: <MaskedNik nik={letter.citizen_nik} />
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -564,8 +574,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab }) =
                       <span className="text-xs font-bold text-slate-900 block">
                         {cit.nama_lengkap}
                       </span>
-                      <span className="text-[11px] font-mono text-slate-500">
-                        NIK: {cit.nik}
+                      <span className="text-[11px] font-mono text-slate-500 flex items-center gap-1">
+                        <span>NIK:</span>
+                        <MaskedNik nik={cit.nik} />
                       </span>
                     </div>
                     <button className="px-2.5 py-1 text-[11px] font-bold text-white bg-sky-600 rounded-lg shadow-sm">

@@ -1,9 +1,10 @@
 // src/layouts/AdminLayout.tsx
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { Sidebar, NavTab } from '../components/Sidebar';
 import { dataService } from '../services/dataService';
+import { getPermittedTabs } from '../utils/rbac';
 
 interface AdminLayoutProps {
   isAuthenticated: boolean;
@@ -17,13 +18,37 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
+  const currentOfficial = dataService.getCurrentOfficial();
+  const permittedTabs = useMemo(() => getPermittedTabs(currentOfficial), [currentOfficial]);
+
+  // Persist sidebar collapsed preference in localStorage
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('dekati_sidebar_collapsed') === 'true';
+  });
+
+  const handleToggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('dekati_sidebar_collapsed', String(next));
+      return next;
+    });
+  };
 
   // Extract active tab from URL pathname (e.g. /admin/letters -> letters)
   const pathParts = location.pathname.split('/').filter(Boolean);
   const currentTab: NavTab = (pathParts[1] as NavTab) || 'dashboard';
+
+  // Lindungi rute modul jika di luar wewenang jobdesk aparatur
+  useEffect(() => {
+    if (isAuthenticated && !permittedTabs.includes(currentTab)) {
+      const fallbackTab = permittedTabs[0] || 'dashboard';
+      navigate(`/admin/${fallbackTab}`, { replace: true });
+    }
+  }, [isAuthenticated, permittedTabs, currentTab, navigate]);
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
 
   const handleSelectTab = (tab: NavTab) => {
     navigate(`/admin/${tab}`);
@@ -47,15 +72,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       <Header
         onOpenLanding={handleOpenLanding}
         onLogout={handleLogoutAdmin}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleSidebar={handleToggleSidebar}
       />
 
       {/* Main Layout Container */}
       <div className="flex-1 flex overflow-hidden w-full">
-        {/* Pinned Sidebar */}
+        {/* Pinned / Collapsible Sidebar */}
         <Sidebar
           activeTab={currentTab}
           onOpenLanding={handleOpenLanding}
           onSelectTab={handleSelectTab}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={handleToggleSidebar}
         />
 
         {/* Scrollable Content Area */}

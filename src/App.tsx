@@ -10,6 +10,7 @@ import {
 import { AdminLayout } from './layouts/AdminLayout';
 import { LandingPageView } from './views/LandingPageView';
 import { dataService } from './services/dataService';
+import { NikPrivacyProvider } from './context/NikPrivacyContext';
 
 // Lazy-loaded views for optimal code-splitting
 const DashboardView = lazy(() => import('./views/DashboardView').then(m => ({ default: m.DashboardView })));
@@ -77,7 +78,7 @@ const DashboardWrapper: React.FC = () => {
 };
 
 export const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !!dataService.getCurrentOfficial());
 
   const handleLoginSuccess = (role: 'admin_desa' | 'kades', userEmail?: string) => {
     setIsAuthenticated(true);
@@ -92,8 +93,9 @@ export const App: React.FC = () => {
 
   return (
     <HashRouter>
-      <Routes>
-        {/* Public Landing Page */}
+      <NikPrivacyProvider>
+        <Routes>
+          {/* Public Landing Page */}
         <Route
           path="/"
           element={<LandingPageWrapper isAuthenticated={isAuthenticated} />}
@@ -196,7 +198,8 @@ export const App: React.FC = () => {
         {/* Fallback wildcard route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </HashRouter>
+    </NikPrivacyProvider>
+  </HashRouter>
   );
 };
 

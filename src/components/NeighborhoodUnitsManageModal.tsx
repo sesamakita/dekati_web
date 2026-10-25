@@ -17,7 +17,10 @@ import {
   MapPin,
   Home,
   UserCheck,
-  Send
+  Send,
+  Users,
+  Layers,
+  ChevronRight
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { NeighborhoodUnit } from '../types';
@@ -39,10 +42,13 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
 }) => {
   const { neighborhoodUnits, saveNeighborhoodUnit, updateNeighborhoodUnit, deleteNeighborhoodUnit, profile } = useData();
 
+  // Tab State: 'rw' | 'rt'
+  const [activeTab, setActiveTab] = useState<'rw' | 'rt'>('rw');
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRw, setFilterRw] = useState<string>('all');
 
-  // Form State (Tambah / Edit RT)
+  // Form State untuk RT
   const [isEditing, setIsEditing] = useState(initialAddMode || !!initialEditUnit);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -55,6 +61,16 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
   const [formRwLeaderPhone, setFormRwLeaderPhone] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
 
+  // Form State khusus RW
+  const [isEditingRw, setIsEditingRw] = useState(false);
+  const [editingRwNumber, setEditingRwNumber] = useState<string | null>(null);
+  const [formRwFieldDusun, setFormRwFieldDusun] = useState('Dusun Sukamaju');
+  const [formRwFieldLeaderName, setFormRwFieldLeaderName] = useState('');
+  const [formRwFieldLeaderPhone, setFormRwFieldLeaderPhone] = useState('');
+  const [formRwFieldInitialRt, setFormRwFieldInitialRt] = useState('01');
+  const [formRwFieldInitialRtLeader, setFormRwFieldInitialRtLeader] = useState('');
+  const [formRwFieldInitialRtPhone, setFormRwFieldInitialRtPhone] = useState('');
+
   // Modal konfirmasi hapus
   const [deletingUnit, setDeletingUnit] = useState<NeighborhoodUnit | null>(null);
 
@@ -62,97 +78,41 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
   const [testingWahaId, setTestingWahaId] = useState<string | null>(null);
   const [testingFormPhone, setTestingFormPhone] = useState(false);
+  const [testingRwPhone, setTestingRwPhone] = useState(false);
 
-  const handleTestWahaUnit = async (unit: NeighborhoodUnit) => {
-    if (!unit.rt_leader_phone) {
-      alert('Nomor WhatsApp Ketua RT belum diisi!');
-      return;
-    }
-    setTestingWahaId(unit.id);
-    try {
-      const res = await wahaService.sendTextMessage(
-        unit.rt_leader_phone,
-        `🔔 *TES INTEGRASI WAHA - SISTEM DEKATI*\n\nHalo *${unit.rt_leader_name || 'Ketua RT'}* (RT ${unit.rt_number} / RW ${unit.rw_number}), nomor WhatsApp Anda ini berhasil terhubung dengan sistem pelayanan e-Surat Desa DEKATI. Nomor ini siap menerima pesan permohonan rekomendasi surat warga secara otomatis.`
-      );
-      if (res.success) {
-        setActionSuccessMessage(`✅ Pesan tes WAHA berhasil dikirim ke WhatsApp ${unit.rt_leader_name} (${unit.rt_leader_phone})!`);
-        setTimeout(() => setActionSuccessMessage(null), 6000);
-      } else {
-        alert(`Gagal mengirim WhatsApp via WAHA: ${res.error || 'Server WAHA tidak merespon'}`);
+  // Grouping RW list
+  const rwGroups = useMemo(() => {
+    const map = new Map<string, {
+      rwNumber: string;
+      dusunName: string;
+      rwLeaderName?: string;
+      rwLeaderPhone?: string;
+      rts: NeighborhoodUnit[];
+    }>();
+
+    neighborhoodUnits.forEach((unit) => {
+      const cleanRw = (unit.rw_number || '01').padStart(2, '0');
+      if (!map.has(cleanRw)) {
+        map.set(cleanRw, {
+          rwNumber: cleanRw,
+          dusunName: unit.dusun_name || 'Dusun Sukamaju',
+          rwLeaderName: unit.rw_leader_name,
+          rwLeaderPhone: unit.rw_leader_phone,
+          rts: []
+        });
       }
-    } catch (err: any) {
-      alert(`Terjadi kesalahan: ${err.message}`);
-    } finally {
-      setTestingWahaId(null);
-    }
-  };
-
-  const handleTestWahaFormPhone = async () => {
-    if (!formRtLeaderPhone.trim()) {
-      alert('Ketik nomor WhatsApp Ketua RT terlebih dahulu!');
-      return;
-    }
-    setTestingFormPhone(true);
-    try {
-      const res = await wahaService.sendTextMessage(
-        formRtLeaderPhone,
-        `🔔 *TES INTEGRASI WAHA - SISTEM DEKATI*\n\nHalo *${formRtLeaderName || 'Ketua RT'}* (RT ${formRtNumber || '-'} / RW ${formRwNumber || '-'}), nomor WhatsApp ini telah berhasil diverifikasi dan terhubung ke server WAHA Sistem Administrasi Desa DEKATI.`
-      );
-      if (res.success) {
-        setActionSuccessMessage(`✅ Pesan tes WAHA terkirim ke ${formRtLeaderPhone}!`);
-        setTimeout(() => setActionSuccessMessage(null), 6000);
-      } else {
-        alert(`Gagal mengirim WhatsApp via WAHA: ${res.error || 'Server WAHA tidak merespon'}`);
+      const g = map.get(cleanRw)!;
+      g.rts.push(unit);
+      if (!g.rwLeaderName && unit.rw_leader_name) {
+        g.rwLeaderName = unit.rw_leader_name;
       }
-    } catch (err: any) {
-      alert(`Terjadi kesalahan: ${err.message}`);
-    } finally {
-      setTestingFormPhone(false);
-    }
-  };
-
-  const handleOpenCreate = useCallback(() => {
-    setEditingId(null);
-    setFormRtNumber('');
-    setFormRwNumber('');
-    setFormDusunName('Dusun Sukamaju');
-    setFormRtLeaderName('');
-    setFormRtLeaderPhone('');
-    setFormRwLeaderName('');
-    setFormRwLeaderPhone('');
-    setFormIsActive(true);
-    setIsEditing(true);
-  }, []);
-
-  const handleOpenEdit = useCallback((unit: NeighborhoodUnit) => {
-    setEditingId(unit.id);
-    setFormRtNumber(unit.rt_number || '');
-    setFormRwNumber(unit.rw_number || '');
-    setFormDusunName(unit.dusun_name || 'Dusun Sukamaju');
-    setFormRtLeaderName(unit.rt_leader_name || '');
-    setFormRtLeaderPhone(unit.rt_leader_phone || '');
-    setFormRwLeaderName(unit.rw_leader_name || '');
-    setFormRwLeaderPhone(unit.rw_leader_phone || '');
-    setFormIsActive(unit.is_active ?? true);
-    setIsEditing(true);
-  }, []);
-
-  // Sync saat modal dibuka
-  useEffect(() => {
-    if (isOpen) {
-      if (initialEditUnit) {
-        handleOpenEdit(initialEditUnit);
-      } else if (initialAddMode) {
-        handleOpenCreate();
-      } else {
-        setIsEditing(false);
-        setEditingId(null);
+      if (!g.rwLeaderPhone && unit.rw_leader_phone) {
+        g.rwLeaderPhone = unit.rw_leader_phone;
       }
-      setSearchQuery('');
-      setFilterRw('all');
-      setActionSuccessMessage(null);
-    }
-  }, [isOpen, initialAddMode, initialEditUnit, handleOpenCreate, handleOpenEdit]);
+    });
+
+    return Array.from(map.values()).sort((a, b) => Number(a.rwNumber) - Number(b.rwNumber));
+  }, [neighborhoodUnits]);
 
   // Unique list of RWs for filter dropdown
   const uniqueRws = useMemo(() => {
@@ -163,7 +123,7 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
     return Array.from(set).sort((a, b) => Number(a) - Number(b));
   }, [neighborhoodUnits]);
 
-  // Filtered & Sorted Units
+  // Filtered & Sorted Units (RT)
   const filteredUnits = useMemo(() => {
     return neighborhoodUnits.filter((u) => {
       if (filterRw !== 'all') {
@@ -193,14 +153,171 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
     });
   }, [neighborhoodUnits, filterRw, searchQuery]);
 
+  // Filtered RWs
+  const filteredRws = useMemo(() => {
+    if (!searchQuery.trim()) return rwGroups;
+    const q = searchQuery.toLowerCase().trim();
+    return rwGroups.filter((g) => {
+      const matchRw = g.rwNumber.includes(q);
+      const matchDusun = g.dusunName.toLowerCase().includes(q);
+      const matchLeader = (g.rwLeaderName || '').toLowerCase().includes(q);
+      const matchPhone = (g.rwLeaderPhone || '').includes(q);
+      const matchAnyRt = g.rts.some((r) => (r.rt_number || '').includes(q) || (r.rt_leader_name || '').toLowerCase().includes(q));
+      return matchRw || matchDusun || matchLeader || matchPhone || matchAnyRt;
+    });
+  }, [rwGroups, searchQuery]);
+
   const showSuccessFeedback = (msg: string) => {
     setActionSuccessMessage(msg);
     setTimeout(() => {
       setActionSuccessMessage(null);
-    }, 3000);
+    }, 4000);
   };
 
-  const handleSaveForm = async (e: React.FormEvent) => {
+  const handleTestWahaUnit = async (unit: NeighborhoodUnit) => {
+    if (!unit.rt_leader_phone) {
+      alert('Nomor WhatsApp Ketua RT belum diisi!');
+      return;
+    }
+    setTestingWahaId(unit.id);
+    try {
+      const res = await wahaService.sendTextMessage(
+        unit.rt_leader_phone,
+        `🔔 *TES INTEGRASI WAHA - SISTEM DEKATI*\n\nHalo *${unit.rt_leader_name || 'Ketua RT'}* (RT ${unit.rt_number} / RW ${unit.rw_number}), nomor WhatsApp Anda ini berhasil terhubung dengan sistem pelayanan e-Surat Desa DEKATI. Nomor ini siap menerima pesan permohonan rekomendasi surat warga secara otomatis.`
+      );
+      if (res.success) {
+        showSuccessFeedback(`✅ Pesan tes WAHA berhasil dikirim ke WhatsApp ${unit.rt_leader_name} (${unit.rt_leader_phone})!`);
+      } else {
+        alert(`Gagal mengirim WhatsApp via WAHA: ${res.error || 'Server WAHA tidak merespon'}`);
+      }
+    } catch (err: any) {
+      alert(`Terjadi kesalahan: ${err.message}`);
+    } finally {
+      setTestingWahaId(null);
+    }
+  };
+
+  const handleTestWahaRw = async (rwLeaderPhone?: string, rwLeaderName?: string, rwNumber?: string) => {
+    if (!rwLeaderPhone) {
+      alert('Nomor WhatsApp Ketua RW belum diisi!');
+      return;
+    }
+    try {
+      const res = await wahaService.sendTextMessage(
+        rwLeaderPhone,
+        `🔔 *TES INTEGRASI WAHA - SISTEM DEKATI*\n\nHalo *${rwLeaderName || 'Ketua RW'}* (RW ${rwNumber || '-'}), nomor WhatsApp Anda ini berhasil terhubung dengan sistem pelayanan administrasi warga Desa DEKATI.`
+      );
+      if (res.success) {
+        showSuccessFeedback(`✅ Pesan tes WAHA berhasil dikirim ke WhatsApp Ketua RW (${rwLeaderPhone})!`);
+      } else {
+        alert(`Gagal mengirim WhatsApp via WAHA: ${res.error || 'Server WAHA tidak merespon'}`);
+      }
+    } catch (err: any) {
+      alert(`Terjadi kesalahan: ${err.message}`);
+    }
+  };
+
+  const handleTestWahaFormPhone = async () => {
+    if (!formRtLeaderPhone.trim()) {
+      alert('Ketik nomor WhatsApp Ketua RT terlebih dahulu!');
+      return;
+    }
+    setTestingFormPhone(true);
+    try {
+      const res = await wahaService.sendTextMessage(
+        formRtLeaderPhone,
+        `🔔 *TES INTEGRASI WAHA - SISTEM DEKATI*\n\nHalo *${formRtLeaderName || 'Ketua RT'}* (RT ${formRtNumber || '-'} / RW ${formRwNumber || '-'}), nomor WhatsApp ini telah berhasil diverifikasi dan terhubung ke server WAHA Sistem Administrasi Desa DEKATI.`
+      );
+      if (res.success) {
+        showSuccessFeedback(`✅ Pesan tes WAHA terkirim ke ${formRtLeaderPhone}!`);
+      } else {
+        alert(`Gagal mengirim WhatsApp via WAHA: ${res.error || 'Server WAHA tidak merespon'}`);
+      }
+    } catch (err: any) {
+      alert(`Terjadi kesalahan: ${err.message}`);
+    } finally {
+      setTestingFormPhone(false);
+    }
+  };
+
+  // Open Form RT
+  const handleOpenCreateRt = useCallback((presetRw?: string) => {
+    setIsEditingRw(false);
+    setEditingId(null);
+    setFormRtNumber('');
+    setFormRwNumber(presetRw || (uniqueRws[0] ? uniqueRws[0].padStart(2, '0') : '01'));
+    setFormDusunName('Dusun Sukamaju');
+    setFormRtLeaderName('');
+    setFormRtLeaderPhone('');
+    setFormRwLeaderName('');
+    setFormRwLeaderPhone('');
+    setFormIsActive(true);
+    setIsEditing(true);
+  }, [uniqueRws]);
+
+  const handleOpenEditRt = useCallback((unit: NeighborhoodUnit) => {
+    setIsEditingRw(false);
+    setEditingId(unit.id);
+    setFormRtNumber(unit.rt_number || '');
+    setFormRwNumber(unit.rw_number || '');
+    setFormDusunName(unit.dusun_name || 'Dusun Sukamaju');
+    setFormRtLeaderName(unit.rt_leader_name || '');
+    setFormRtLeaderPhone(unit.rt_leader_phone || '');
+    setFormRwLeaderName(unit.rw_leader_name || '');
+    setFormRwLeaderPhone(unit.rw_leader_phone || '');
+    setFormIsActive(unit.is_active ?? true);
+    setIsEditing(true);
+  }, []);
+
+  // Open Form RW
+  const handleOpenCreateRw = useCallback(() => {
+    setIsEditing(false);
+    setEditingId(null);
+    setEditingRwNumber(null);
+    setFormRwNumber('');
+    setFormRwFieldDusun('Dusun Sukamaju');
+    setFormRwFieldLeaderName('');
+    setFormRwFieldLeaderPhone('');
+    setFormRwFieldInitialRt('01');
+    setFormRwFieldInitialRtLeader('');
+    setFormRwFieldInitialRtPhone('');
+    setIsEditingRw(true);
+  }, []);
+
+  const handleOpenEditRw = useCallback((rwNumber: string) => {
+    const cleanRw = rwNumber.padStart(2, '0');
+    const group = rwGroups.find((g) => g.rwNumber === cleanRw);
+    setIsEditing(false);
+    setEditingId(null);
+    setEditingRwNumber(cleanRw);
+    setFormRwNumber(cleanRw);
+    setFormRwFieldDusun(group?.dusunName || 'Dusun Sukamaju');
+    setFormRwFieldLeaderName(group?.rwLeaderName || '');
+    setFormRwFieldLeaderPhone(group?.rwLeaderPhone || '');
+    setIsEditingRw(true);
+  }, [rwGroups]);
+
+  // Sync saat modal dibuka
+  useEffect(() => {
+    if (isOpen) {
+      if (initialEditUnit) {
+        handleOpenEditRt(initialEditUnit);
+      } else if (initialAddMode) {
+        handleOpenCreateRt();
+      } else {
+        setIsEditing(false);
+        setIsEditingRw(false);
+        setEditingId(null);
+        setEditingRwNumber(null);
+      }
+      setSearchQuery('');
+      setFilterRw('all');
+      setActionSuccessMessage(null);
+    }
+  }, [isOpen, initialAddMode, initialEditUnit, handleOpenCreateRt, handleOpenEditRt]);
+
+  // Save RT
+  const handleSaveRtForm = async (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -260,6 +377,53 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
     setEditingId(null);
   };
 
+  // Save RW
+  const handleSaveRwForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const cleanRw = formRwNumber.trim().padStart(2, '0');
+    if (!cleanRw || cleanRw === '00') {
+      alert('Mohon isi nomor RW dengan benar (contoh: 01, 02).');
+      return;
+    }
+
+    if (editingRwNumber) {
+      // Mode Edit RW: Perbarui semua RT yang ada di bawah RW ini
+      const matchingUnits = neighborhoodUnits.filter((u) => (u.rw_number || '').padStart(2, '0') === editingRwNumber);
+      for (const unit of matchingUnits) {
+        await updateNeighborhoodUnit(unit.id, {
+          rw_number: cleanRw,
+          dusun_name: formRwFieldDusun.trim() || unit.dusun_name,
+          rw_leader_name: formRwFieldLeaderName.trim() || undefined,
+          rw_leader_phone: formRwFieldLeaderPhone.trim() || undefined,
+        });
+      }
+      showSuccessFeedback(`Data Wilayah RW ${cleanRw} berhasil diperbarui untuk ${matchingUnits.length} unit RT.`);
+    } else {
+      // Mode Tambah RW Baru
+      const cleanRt = (formRwFieldInitialRt.trim() || '01').padStart(2, '0');
+      const newUnit: NeighborhoodUnit = {
+        id: `rt-${cleanRt}-rw-${cleanRw}-${Date.now()}`,
+        village_code: profile.code || '3201012001',
+        dusun_name: formRwFieldDusun.trim() || 'Dusun Sukamaju',
+        rt_number: cleanRt,
+        rw_number: cleanRw,
+        rt_leader_name: formRwFieldInitialRtLeader.trim() || formRwFieldLeaderName.trim() || `Ketua RT ${cleanRt}`,
+        rt_leader_phone: formRwFieldInitialRtPhone.trim() || formRwFieldLeaderPhone.trim() || '0812-0000-0000',
+        rw_leader_name: formRwFieldLeaderName.trim() || undefined,
+        rw_leader_phone: formRwFieldLeaderPhone.trim() || undefined,
+        is_active: true,
+        created_at: new Date().toISOString()
+      };
+      await saveNeighborhoodUnit(newUnit);
+      showSuccessFeedback(`Wilayah RW ${cleanRw} (beserta RT ${cleanRt} awal) berhasil didaftarkan.`);
+    }
+
+    setIsEditingRw(false);
+    setEditingRwNumber(null);
+  };
+
   const handleDeleteConfirm = async (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!deletingUnit) return;
@@ -282,7 +446,6 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
     }
   };
 
-  // Early return ONLY after all hooks have been invoked
   if (!isOpen || typeof document === 'undefined') return null;
 
   return createPortal(
@@ -295,8 +458,8 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
         <div className="shrink-0 px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-white">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-600/25">
-              {isEditing ? (
-                editingId ? <Edit3 className="w-5 h-5" /> : <Plus className="w-5 h-5" />
+              {isEditing || isEditingRw ? (
+                <Edit3 className="w-5 h-5" />
               ) : (
                 <Building className="w-5 h-5" />
               )}
@@ -304,30 +467,32 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
             <div>
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <span>
-                  {isEditing
-                    ? editingId
-                      ? `Edit Data RT ${formRtNumber || ''} / RW ${formRwNumber || ''}`
-                      : 'Tambah Wilayah RT Baru'
-                    : 'Kelola Wilayah Rukun Tetangga (RT & RW)'}
+                  {isEditingRw
+                    ? editingRwNumber ? `Edit Data Rukun Warga (RW ${editingRwNumber})` : 'Tambah Wilayah RW Baru'
+                    : isEditing
+                    ? editingId ? `Edit Data RT ${formRtNumber || ''} / RW ${formRwNumber || ''}` : 'Tambah Wilayah RT Baru'
+                    : 'Basis Data Wilayah RT & RW Desa'}
                 </span>
-                {!isEditing && (
+                {!isEditing && !isEditingRw && (
                   <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                    {neighborhoodUnits.length} RT Terdaftar
+                    {rwGroups.length} RW • {neighborhoodUnits.length} RT
                   </span>
                 )}
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                {isEditing
+                {isEditingRw
+                  ? 'Atur nomor RW, nama dusun, dan kontak WhatsApp Ketua RW'
+                  : isEditing
                   ? 'Lengkapi nomor RT, RW, dusun, dan kontak WhatsApp Ketua RT untuk aplikasi warga'
-                  : 'Kelola wilayah RT, perbarui nomor WhatsApp Ketua RT, atau sesuaikan pembagian dusun'}
+                  : 'Kelola data wilayah Rukun Warga (RW) dan Rukun Tetangga (RT) beserta nomor kontak resmi'}
               </p>
             </div>
           </div>
           <button
             type="button"
-            onClick={isEditing ? () => { setIsEditing(false); setEditingId(null); } : onClose}
-            className="w-9 h-9 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-all"
-            title={isEditing ? 'Kembali ke Daftar' : 'Tutup'}
+            onClick={isEditing || isEditingRw ? () => { setIsEditing(false); setIsEditingRw(false); setEditingId(null); setEditingRwNumber(null); } : onClose}
+            className="w-9 h-9 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-all cursor-pointer"
+            title={isEditing || isEditingRw ? 'Kembali ke Daftar' : 'Tutup'}
           >
             <X className="w-5 h-5" />
           </button>
@@ -342,9 +507,162 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
         )}
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* FORM MODE: TAMBAH / EDIT RT */}
-          {isEditing ? (
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          {/* A. FORM MODE: TAMBAH / EDIT KHUSUS RW */}
+          {isEditingRw ? (
+            <div className="bg-slate-50 p-6 sm:p-7 rounded-3xl border border-slate-200/90 space-y-5 animate-fade-in">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                  <Layers className="w-4 h-4 text-indigo-600" />
+                  <span>{editingRwNumber ? `Pembaruan Data Rukun Warga (RW ${editingRwNumber})` : 'Formulir Pendaftaran RW Baru'}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditingRw(false);
+                    setEditingRwNumber(null);
+                  }}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-800 bg-white px-3 py-1.5 rounded-lg border border-slate-200 transition-colors cursor-pointer"
+                >
+                  <span>&larr; Batal &amp; Kembali</span>
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveRwForm} className="space-y-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Nomor RW */}
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 block">
+                      Nomor RW <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={3}
+                      required
+                      value={formRwNumber}
+                      onChange={(e) => setFormRwNumber(e.target.value.replace(/[^0-9]/g, ''))}
+                      placeholder="Contoh: 01"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-mono font-bold text-slate-900 focus:outline-none focus:border-indigo-500 text-xs shadow-2xs"
+                    />
+                  </div>
+
+                  {/* Dusun */}
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 block">
+                      Dusun / Lingkungan Wilayah <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formRwFieldDusun}
+                      onChange={(e) => setFormRwFieldDusun(e.target.value)}
+                      placeholder="Contoh: Dusun Sukamaju"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-semibold text-slate-900 focus:outline-none focus:border-indigo-500 text-xs shadow-2xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-200/80">
+                  {/* Nama Ketua RW */}
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 block">
+                      Nama Ketua RW <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formRwFieldLeaderName}
+                      onChange={(e) => setFormRwFieldLeaderName(e.target.value)}
+                      placeholder="Contoh: Bpk. H. Mansyur"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-semibold text-slate-900 focus:outline-none focus:border-indigo-500 text-xs shadow-2xs"
+                    />
+                  </div>
+
+                  {/* WhatsApp Ketua RW */}
+                  <div className="space-y-1">
+                    <label className="font-bold text-slate-700 block flex items-center justify-between">
+                      <span>No. WhatsApp Ketua RW <span className="text-rose-500">*</span></span>
+                      <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded">Tampil di portal warga</span>
+                    </label>
+                    <div className="relative">
+                      <MessageCircle className="w-4 h-4 text-emerald-600 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        required
+                        value={formRwFieldLeaderPhone}
+                        onChange={(e) => setFormRwFieldLeaderPhone(e.target.value)}
+                        placeholder="Contoh: 0812-3456-7800"
+                        className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-mono font-bold text-slate-900 focus:outline-none focus:border-indigo-500 text-xs shadow-2xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {!editingRwNumber && (
+                  <div className="p-3.5 bg-indigo-50/60 rounded-2xl border border-indigo-200/70 space-y-3">
+                    <div className="font-bold text-indigo-950 text-xs flex items-center gap-1.5">
+                      <Home className="w-4 h-4 text-indigo-600" />
+                      <span>Unit RT Perdana di bawah RW ini:</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-700 block">Nomor RT</label>
+                        <input
+                          type="text"
+                          maxLength={3}
+                          value={formRwFieldInitialRt}
+                          onChange={(e) => setFormRwFieldInitialRt(e.target.value.replace(/[^0-9]/g, ''))}
+                          placeholder="01"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono font-bold text-slate-900 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-700 block">Ketua RT</label>
+                        <input
+                          type="text"
+                          value={formRwFieldInitialRtLeader}
+                          onChange={(e) => setFormRwFieldInitialRtLeader(e.target.value)}
+                          placeholder="Bpk. Hendra"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="font-semibold text-slate-700 block">WhatsApp RT</label>
+                        <input
+                          type="text"
+                          value={formRwFieldInitialRtPhone}
+                          onChange={(e) => setFormRwFieldInitialRtPhone(e.target.value)}
+                          placeholder="0812-xxxx-xxxx"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono text-slate-900 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingRw(false);
+                      setEditingRwNumber(null);
+                    }}
+                    className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md shadow-indigo-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{editingRwNumber ? 'Simpan Data RW' : 'Daftarkan RW Baru'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : isEditing ? (
+            /* B. FORM MODE: TAMBAH / EDIT RT */
             <div className="bg-slate-50 p-6 sm:p-7 rounded-3xl border border-slate-200/90 space-y-5 animate-fade-in">
               <div className="flex items-center justify-between pb-3 border-b border-slate-200">
                 <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
@@ -357,13 +675,13 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
                     setIsEditing(false);
                     setEditingId(null);
                   }}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-800 bg-white px-3 py-1.5 rounded-lg border border-slate-200 transition-colors"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-800 bg-white px-3 py-1.5 rounded-lg border border-slate-200 transition-colors cursor-pointer"
                 >
                   <span>&larr; Batal &amp; Kembali ke Daftar</span>
                 </button>
               </div>
 
-              <form onSubmit={handleSaveForm} className="space-y-5 text-xs">
+              <form onSubmit={handleSaveRtForm} className="space-y-4 text-xs">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {/* Nomor RT */}
                   <div className="space-y-1">
@@ -397,7 +715,7 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
                     />
                   </div>
 
-                  {/* Nama Dusun / Lingkungan */}
+                  {/* Dusun */}
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 block">
                       Dusun / Lingkungan <span className="text-rose-500">*</span>
@@ -433,7 +751,7 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
                   <div className="space-y-1">
                     <label className="font-bold text-slate-700 block flex items-center justify-between">
                       <span>No. WhatsApp Ketua RT <span className="text-rose-500">*</span></span>
-                      <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded">Tampil di APK warga</span>
+                      <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded">Notifikasi Surat</span>
                     </label>
                     <div className="relative">
                       <MessageCircle className="w-4 h-4 text-emerald-600 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -445,20 +763,6 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
                         placeholder="Contoh: 0812-3456-7891"
                         className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-mono font-bold text-slate-900 focus:outline-none focus:border-blue-500 text-xs shadow-2xs"
                       />
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] pt-1">
-                      <span className="text-slate-400">Target penerima permohonan surat via WAHA</span>
-                      {formRtLeaderPhone.replace(/[^0-9]/g, '').length >= 8 && (
-                        <button
-                          type="button"
-                          disabled={testingFormPhone}
-                          onClick={handleTestWahaFormPhone}
-                          className="inline-flex items-center gap-1 font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 px-2 py-0.5 rounded-md border border-purple-200 transition-colors disabled:opacity-50"
-                        >
-                          <Send className="w-2.5 h-2.5" />
-                          <span>{testingFormPhone ? 'Mengirim...' : 'Tes Kirim WAHA'}</span>
-                        </button>
-                      )}
                     </div>
                   </div>
 
@@ -474,9 +778,9 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
                     />
                   </div>
 
-                  {/* Nomor Telepon / WA Ketua RW (Opsional) */}
+                  {/* Nomor WhatsApp Ketua RW (Opsional) */}
                   <div className="space-y-1">
-                    <label className="font-bold text-slate-700 block">No. Telepon / WA Ketua RW (Opsional)</label>
+                    <label className="font-bold text-slate-700 block">No. WhatsApp Ketua RW (Opsional)</label>
                     <input
                       type="text"
                       value={formRwLeaderPhone}
@@ -487,7 +791,6 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
                   </div>
                 </div>
 
-                {/* Form Action Buttons */}
                 <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
                   <button
                     type="button"
@@ -495,13 +798,13 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
                       setIsEditing(false);
                       setEditingId(null);
                     }}
-                    className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition-colors"
+                    className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition-colors cursor-pointer"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                   >
                     <Save className="w-4 h-4" />
                     <span>{editingId ? 'Simpan Perubahan RT' : 'Tambah Unit RT'}</span>
@@ -510,28 +813,79 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
               </form>
             </div>
           ) : (
+            /* C. DAFTAR VIEW: TAB PILIHAN RW ATAU RT */
             <>
-              {/* TOOLBAR: SEARCH & FILTER */}
+              {/* TAB SWITCHER & ACTION BUTTONS */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+                {/* Pill Tabs: RW vs RT */}
+                <div className="flex items-center p-1 bg-slate-100 rounded-2xl border border-slate-200/80">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('rw')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      activeTab === 'rw'
+                        ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/70'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Layers className="w-4 h-4 text-indigo-600" />
+                    <span>Wilayah RW ({rwGroups.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('rt')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      activeTab === 'rt'
+                        ? 'bg-white text-blue-700 shadow-sm border border-slate-200/70'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Home className="w-4 h-4 text-blue-600" />
+                    <span>Wilayah RT ({neighborhoodUnits.length})</span>
+                  </button>
+                </div>
+
+                {/* Primary Add Buttons: Tambah RW & Tambah RT */}
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    onClick={handleOpenCreateRw}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Tambah RW Baru</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenCreateRt()}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Tambah RT Baru</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* SEARCH & FILTER BAR */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="flex items-center gap-2 w-full sm:w-auto flex-1">
-                  {/* Search */}
                   <div className="relative flex-1 sm:max-w-xs">
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
-                      placeholder="Cari RT, RW, nama ketua, dusun..."
+                      placeholder={activeTab === 'rw' ? "Cari nomor RW, ketua, dusun..." : "Cari RT, RW, nama ketua, dusun..."}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-blue-500 transition-all"
                     />
                   </div>
 
-                  {/* Filter RW */}
-                  {uniqueRws.length > 0 && (
+                  {activeTab === 'rt' && uniqueRws.length > 0 && (
                     <select
                       value={filterRw}
                       onChange={(e) => setFilterRw(e.target.value)}
-                      className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:border-blue-500 transition-all"
+                      className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:border-blue-500 transition-all cursor-pointer"
                     >
                       <option value="all">Semua RW</option>
                       {uniqueRws.map((rw) => (
@@ -543,157 +897,268 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
                   )}
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                  <button
-                    type="button"
-                    onClick={handleResetToDefault}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold transition-colors"
-                    title="Kembalikan susunan RT ke standar awal Desa Sukamaju"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Reset Standar</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleOpenCreate}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all hover:scale-105 active:scale-95"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Tambah RT Baru</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleResetToDefault}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 text-xs font-semibold transition-colors cursor-pointer ml-auto"
+                  title="Kembalikan susunan RT/RW ke standar awal"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset Standar</span>
+                </button>
               </div>
 
-              {/* DAFTAR KARTU RT / RW */}
-              <div className="space-y-3">
-                {filteredUnits.length === 0 ? (
-                  <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200 p-6 space-y-2">
-                    <Building className="w-8 h-8 text-slate-300 mx-auto" />
-                    <p className="text-xs font-bold text-slate-700">Tidak ada unit RT yang cocok</p>
-                    <p className="text-[11px] text-slate-400">Silakan ubah kata kunci pencarian atau tambah unit RT baru.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    {filteredUnits.map((unit) => {
-                      const cleanPhone = (unit.rt_leader_phone || '').replace(/[^0-9]/g, '');
-                      const waNumber = cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone;
-                      const waUrl = waNumber ? `https://wa.me/${waNumber}` : null;
+              {/* VIEW TAB 1: DAFTAR KHUSUS WILAYAH RW (RUKUN WARGA) */}
+              {activeTab === 'rw' && (
+                <div className="space-y-4">
+                  {filteredRws.length === 0 ? (
+                    <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200 p-6 space-y-2">
+                      <Layers className="w-8 h-8 text-slate-300 mx-auto" />
+                      <p className="text-xs font-bold text-slate-700">Tidak ada data Rukun Warga (RW) yang cocok</p>
+                      <p className="text-[11px] text-slate-400">Silakan klik tombol "Tambah RW Baru" di atas.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {filteredRws.map((group) => {
+                        const cleanPhone = (group.rwLeaderPhone || '').replace(/[^0-9]/g, '');
+                        const waNumber = cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone;
+                        const waUrl = waNumber ? `https://wa.me/${waNumber}` : null;
 
-                      return (
-                        <div
-                          key={unit.id}
-                          className="p-4 bg-white rounded-2xl border border-slate-200/90 hover:border-blue-300 hover:shadow-sm transition-all flex flex-col justify-between gap-3 text-xs"
-                        >
-                          <div>
-                            {/* Top Badge: RT / RW & Dusun */}
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-1.5">
-                                <span className="px-2.5 py-0.5 rounded-lg bg-blue-100 text-blue-900 font-extrabold text-xs border border-blue-200">
-                                  RT {unit.rt_number} / RW {unit.rw_number}
-                                </span>
-                                {unit.dusun_name && (
-                                  <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md truncate max-w-[140px]">
-                                    {unit.dusun_name}
+                        return (
+                          <div
+                            key={group.rwNumber}
+                            className="p-5 bg-white rounded-3xl border border-slate-200/90 hover:border-indigo-300 hover:shadow-md transition-all flex flex-col justify-between gap-4 text-xs"
+                          >
+                            <div className="space-y-3">
+                              {/* Header Card: RW & Dusun */}
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="px-3 py-1 rounded-xl bg-indigo-50 text-indigo-900 font-extrabold text-sm border border-indigo-200/80">
+                                    RW {group.rwNumber}
                                   </span>
-                                )}
-                              </div>
+                                  <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-lg">
+                                    {group.dusunName}
+                                  </span>
+                                </div>
 
-                              {/* Action Buttons */}
-                              <div className="flex items-center gap-1">
                                 <button
                                   type="button"
-                                  onClick={() => handleOpenEdit(unit)}
-                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition-colors"
-                                  title="Edit Data RT"
+                                  onClick={() => handleOpenEditRw(group.rwNumber)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 font-bold text-xs transition-colors cursor-pointer"
+                                  title="Edit data Ketua RW & Dusun"
                                 >
                                   <Edit3 className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setDeletingUnit(unit)}
-                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 transition-colors"
-                                  title="Hapus Unit RT"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Edit RW</span>
                                 </button>
                               </div>
-                            </div>
 
-                            {/* Leader Info */}
-                            <div className="mt-3 space-y-1">
-                              <div className="flex items-center gap-2">
-                                <UserCheck className="w-4 h-4 text-blue-600 shrink-0" />
-                                <span className="font-bold text-slate-900 text-sm truncate">
-                                  {unit.rt_leader_name}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 text-slate-500 text-[11px] pl-6 font-mono">
-                                <span>WhatsApp:</span>
-                                <span className="font-bold text-slate-800">{unit.rt_leader_phone || '-'}</span>
-                              </div>
-                              {unit.rw_leader_name && (
-                                <div className="text-[10.5px] text-slate-400 pl-6 mt-1">
-                                  Ketua RW: {unit.rw_leader_name}
+                              {/* Leader Details */}
+                              <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1.5">
+                                <div className="text-[11px] text-slate-400 font-medium">Ketua Rukun Warga:</div>
+                                <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                                  <UserCheck className="w-4 h-4 text-indigo-600 shrink-0" />
+                                  <span className="truncate">{group.rwLeaderName || 'Belum Ditentukan'}</span>
                                 </div>
-                              )}
+                                <div className="text-[11px] font-mono text-slate-600 pl-6 flex items-center justify-between">
+                                  <span>WhatsApp: {group.rwLeaderPhone || '-'}</span>
+                                  {group.rwLeaderPhone && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleTestWahaRw(group.rwLeaderPhone, group.rwLeaderName, group.rwNumber)}
+                                      className="text-[10px] font-bold text-purple-700 hover:underline cursor-pointer"
+                                    >
+                                      Tes WAHA
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* RT List Under This RW */}
+                              <div className="space-y-1.5">
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="font-bold text-slate-700">Daftar RT di RW {group.rwNumber}:</span>
+                                  <span className="font-extrabold text-indigo-700">{group.rts.length} Unit RT</span>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {group.rts.map((rt) => (
+                                    <button
+                                      key={rt.id}
+                                      type="button"
+                                      onClick={() => handleOpenEditRt(rt)}
+                                      className="px-2.5 py-1 rounded-xl bg-blue-50/70 hover:bg-blue-100 text-blue-900 border border-blue-200/80 text-[11px] font-bold transition-colors cursor-pointer"
+                                      title={`Klik untuk edit RT ${rt.rt_number} (${rt.rt_leader_name})`}
+                                    >
+                                      RT {rt.rt_number}
+                                    </button>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenCreateRt(group.rwNumber)}
+                                    className="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 border border-dashed border-slate-300 text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1"
+                                    title={`Tambah RT baru khusus di bawah RW ${group.rwNumber}`}
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    <span>Tambah RT</span>
+                                  </button>
+                                </div>
+                              </div>
                             </div>
-                          </div>
 
-                          {/* Card Footer: WhatsApp Quick Chat & WAHA Test */}
-                          <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
-                            <span className="text-[10.5px] text-emerald-700 font-semibold flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                              Siaga Kontak
-                            </span>
-
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                disabled={testingWahaId === unit.id}
-                                onClick={() => handleTestWahaUnit(unit)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 font-bold text-xs border border-purple-200 transition-colors disabled:opacity-50"
-                                title="Kirim pesan tes WhatsApp ke nomor Ketua RT ini via server WAHA"
-                              >
-                                <Send className="w-3 h-3" />
-                                <span>{testingWahaId === unit.id ? 'Menguji...' : 'Tes WAHA'}</span>
-                              </button>
-
+                            {/* Footer RW */}
+                            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                              <span className="text-[10px] text-slate-400">
+                                Mengkoordinasikan RT di {group.dusunName}
+                              </span>
                               {waUrl && (
                                 <a
                                   href={waUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-xs border border-emerald-200/80 transition-colors"
-                                  title="Buka obrolan langsung WhatsApp Web"
+                                  className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:underline"
                                 >
                                   <MessageCircle className="w-3.5 h-3.5 fill-current" />
-                                  <span>Chat WA</span>
+                                  <span>Chat WA Ketua RW</span>
                                 </a>
                               )}
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* VIEW TAB 2: DAFTAR UNIT RT (RUKUN TETANGGA) */}
+              {activeTab === 'rt' && (
+                <div className="space-y-3">
+                  {filteredUnits.length === 0 ? (
+                    <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200 p-6 space-y-2">
+                      <Building className="w-8 h-8 text-slate-300 mx-auto" />
+                      <p className="text-xs font-bold text-slate-700">Tidak ada unit RT yang cocok</p>
+                      <p className="text-[11px] text-slate-400">Silakan ubah kata kunci pencarian atau tambah unit RT baru.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {filteredUnits.map((unit) => {
+                        const cleanPhone = (unit.rt_leader_phone || '').replace(/[^0-9]/g, '');
+                        const waNumber = cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone;
+                        const waUrl = waNumber ? `https://wa.me/${waNumber}` : null;
+
+                        return (
+                          <div
+                            key={unit.id}
+                            className="p-4 bg-white rounded-2xl border border-slate-200/90 hover:border-blue-300 hover:shadow-sm transition-all flex flex-col justify-between gap-3 text-xs"
+                          >
+                            <div>
+                              {/* Top Badge: RT / RW & Dusun */}
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="px-2.5 py-0.5 rounded-lg bg-blue-100 text-blue-900 font-extrabold text-xs border border-blue-200">
+                                    RT {unit.rt_number} / RW {unit.rw_number}
+                                  </span>
+                                  {unit.dusun_name && (
+                                    <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md truncate max-w-[140px]">
+                                      {unit.dusun_name}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditRt(unit)}
+                                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition-colors cursor-pointer"
+                                    title="Edit Data RT"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setDeletingUnit(unit)}
+                                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 transition-colors cursor-pointer"
+                                    title="Hapus Unit RT"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Leader Info */}
+                              <div className="mt-3 space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <UserCheck className="w-4 h-4 text-blue-600 shrink-0" />
+                                  <span className="font-bold text-slate-900 text-sm truncate">
+                                    {unit.rt_leader_name}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-slate-500 text-[11px] pl-6 font-mono">
+                                  <span>WhatsApp:</span>
+                                  <span className="font-bold text-slate-800">{unit.rt_leader_phone || '-'}</span>
+                                </div>
+                                {unit.rw_leader_name && (
+                                  <div className="text-[10.5px] text-slate-400 pl-6 mt-1">
+                                    Ketua RW {unit.rw_number}: {unit.rw_leader_name}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Card Footer: WhatsApp Quick Chat & WAHA Test */}
+                            <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
+                              <span className="text-[10.5px] text-emerald-700 font-semibold flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Siaga Surat
+                              </span>
+
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  disabled={testingWahaId === unit.id}
+                                  onClick={() => handleTestWahaUnit(unit)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 font-bold text-xs border border-purple-200 transition-colors disabled:opacity-50 cursor-pointer"
+                                  title="Kirim pesan tes WhatsApp ke nomor Ketua RT ini via server WAHA"
+                                >
+                                  <Send className="w-3 h-3" />
+                                  <span>{testingWahaId === unit.id ? 'Menguji...' : 'Tes WAHA'}</span>
+                                </button>
+
+                                {waUrl && (
+                                  <a
+                                    href={waUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-xs border border-emerald-200/80 transition-colors"
+                                    title="Buka obrolan langsung WhatsApp Web"
+                                  >
+                                    <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                                    <span>Chat WA</span>
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
 
         {/* Footer Modal */}
-        {!isEditing && (
+        {!isEditing && !isEditingRw && (
           <div className="shrink-0 px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-xs">
             <span className="text-slate-500">
-              Perubahan nomor WhatsApp &amp; data Ketua RT langsung tersinkron ke tab Kontak Darurat di aplikasi mobile warga.
+              Data RW dan RT terintegrasi otomatis dengan alur verifikasi berkas e-Surat dan kontak darurat aplikasi warga.
             </span>
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold transition-colors"
+              className="px-5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold transition-colors cursor-pointer"
             >
               Selesai
             </button>
@@ -729,14 +1194,14 @@ export const NeighborhoodUnitsManageModal: React.FC<NeighborhoodUnitsManageModal
                     e.stopPropagation();
                     setDeletingUnit(null);
                   }}
-                  className="flex-1 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 text-xs transition-colors"
+                  className="flex-1 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 text-xs transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="button"
                   onClick={handleDeleteConfirm}
-                  className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm transition-colors"
+                  className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm transition-colors cursor-pointer"
                 >
                   Ya, Hapus
                 </button>

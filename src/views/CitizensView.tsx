@@ -32,6 +32,7 @@ import {
   generateOccupationReportCsv,
   OCCUPATION_CATEGORIES,
 } from '../services/occupationUtils';
+import { MaskedNik } from '../components/MaskedNik';
 
 export const CitizensView: React.FC = () => {
   const { citizens, profile, syncFromSupabase } = useData();
@@ -115,18 +116,19 @@ export const CitizensView: React.FC = () => {
     const rows = citizens
       .map(
         (c) =>
-          `"${c.id}","${c.nik || ''}","${c.no_kk || ''}","${c.nama_lengkap || ''}","${c.jenis_kelamin || ''}","${c.status_dalam_keluarga || ''}","${c.pekerjaan || ''}","${normalizeOccupation(c.pekerjaan, c.tanggal_lahir, c.nik)}","${c.dusun || ''}","${c.rt || ''}","${c.rw || ''}","${c.phone_number || ''}","${c.is_verified ? 'Ya' : 'Belum'}"`
+          `"${c.id}","\t${c.nik || ''}","\t${c.no_kk || ''}","${(c.nama_lengkap || '').replace(/"/g, '""')}","${c.jenis_kelamin || ''}","${c.status_dalam_keluarga || ''}","${(c.pekerjaan || '').replace(/"/g, '""')}","${normalizeOccupation(c.pekerjaan, c.tanggal_lahir, c.nik)}","${c.dusun || ''}","${c.rt || ''}","${c.rw || ''}","\t${c.phone_number || ''}","${c.is_verified ? 'Ya' : 'Belum'}"`
       )
       .join('\n');
 
-    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + headers + rows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `buku_induk_kependudukan_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `buku_induk_kependudukan_${(profile?.name || 'Desa').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleExportOccupationCsv = () => {
@@ -343,7 +345,9 @@ export const CitizensView: React.FC = () => {
                         onClick={() => setSelectedCitizen(citizen)}
                       >
                         <td className="py-4 px-5 font-mono">
-                          <div className="font-bold text-slate-900">{citizen.nik}</div>
+                          <div className="font-bold text-slate-900">
+                            <MaskedNik nik={citizen.nik} />
+                          </div>
                           <div className="text-[11px] text-slate-400">KK: {citizen.no_kk || '-'}</div>
                         </td>
                         <td className="py-4 px-4">
@@ -499,8 +503,9 @@ export const CitizensView: React.FC = () => {
                             <span className="text-[11px] text-slate-500 ml-1.5">
                               ({member.status_dalam_keluarga || 'Anggota'})
                             </span>
-                            <div className="text-[10px] font-mono text-slate-400">
-                              NIK: {member.nik}
+                            <div className="text-[10px] font-mono text-slate-500 flex items-center gap-1">
+                              <span>NIK:</span>
+                              <MaskedNik nik={member.nik} className="text-[10px]" />
                             </div>
                           </div>
                         </div>

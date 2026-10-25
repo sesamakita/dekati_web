@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { LetterRequest, VillageProfile } from '../types';
 import { dataService } from '../services/dataService';
+import { nikPrivacyService } from '../services/nikPrivacyService';
 import { LetterPrintModal } from '../components/LetterPrintModal';
 
 export const PublicVerifyView: React.FC = () => {
@@ -72,8 +73,7 @@ export const PublicVerifyView: React.FC = () => {
   };
 
   const formatMaskedNik = (nik?: string) => {
-    if (!nik || nik.length < 16) return '----------------';
-    return `${nik.slice(0, 6)}******${nik.slice(12)}`;
+    return nikPrivacyService.maskNik(nik);
   };
 
   const isVerified = letter && (letter.status === 'signed' || letter.status === 'completed');

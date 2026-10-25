@@ -78,6 +78,23 @@ export const AuthView: React.FC<AuthViewProps> = ({
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
+  const [regReferralCode, setRegReferralCode] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const hashQuery = window.location.hash.split('?')[1] || '';
+      const hashParams = new URLSearchParams(hashQuery);
+      const detected = urlParams.get('ref') || hashParams.get('ref');
+      if (detected) {
+        const clean = detected.trim().toUpperCase();
+        localStorage.setItem('dekati_referral_code_v1', clean);
+        return clean;
+      }
+      return localStorage.getItem('dekati_referral_code_v1') || '';
+    } catch {
+      return '';
+    }
+  });
   const [regAgree, setRegAgree] = useState(true);
   const [registerSuccess, setRegisterSuccess] = useState(false);
 
@@ -257,6 +274,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
         district: regDistrict,
         regency: regRegency,
         province: regProvince,
+        referral_code: regReferralCode.trim().toUpperCase() || undefined,
       });
 
       if (result.success && result.user) {
@@ -573,16 +591,20 @@ export const AuthView: React.FC<AuthViewProps> = ({
             {authMode === 'register' && (
               <div className="space-y-4 animate-fade-in">
                 <div>
-                  <h3 className="text-xl font-bold text-slate-900">Registrasi Aparat Desa / Lurah</h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Daftarkan akun kedinasan untuk pamong desa baru di wilayah Anda.
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 mb-2">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Akun Induk Wilayah Perdana</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900">Registrasi Perdana Desa / Kelurahan</h3>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Setiap desa/kelurahan mendaftar <strong>1 Akun Induk</strong> (Kepala Desa, Lurah, atau Sekretaris Desa). Akun aparatur lainnya (Kasi, Kaur, Operator) ditambahkan dari dalam sistem setelah aktivasi.
                   </p>
                 </div>
 
                 <form onSubmit={handleRegisterSubmit} className="space-y-3.5 text-xs">
                   {/* Jabatan */}
                   <div className="space-y-1">
-                    <label className="font-bold text-slate-700 block">Jabatan / Kewenangan:</label>
+                    <label className="font-bold text-slate-700 block">Kewenangan Pimpinan Pendaftar:</label>
                     <select
                       value={regRole}
                       onChange={(e) => setRegRole(e.target.value)}
@@ -596,14 +618,6 @@ export const AuthView: React.FC<AuthViewProps> = ({
                       <option value="sekdes">
                         {regVillageType === 'kelurahan' ? 'Sekretaris Kelurahan (Seklur)' : 'Sekretaris Desa (Sekdes/Carik)'}
                       </option>
-                      <option value="kasi_layanan">Kasi Pelayanan (Verifikator Surat)</option>
-                      <option value="kaur_pembangunan">
-                        {regVillageType === 'kelurahan' ? 'Seksi Ketenteraman / Pembangunan' : 'Kaur Pembangunan (Penanganan Aduan)'}
-                      </option>
-                      <option value="kaur_keuangan">
-                        {regVillageType === 'kelurahan' ? 'Bendahara Pengeluaran Pembantu' : 'Kaur Keuangan (Bendahara APBDes)'}
-                      </option>
-                      <option value="satlinmas">Satlinmas & Ketenteraman</option>
                     </select>
                   </div>
 
@@ -746,11 +760,19 @@ export const AuthView: React.FC<AuthViewProps> = ({
                               <option value="">-- Pilih Desa/Kelurahan --</option>
                               {villages
                                 .filter((v) => !searchWilayah || v.name.toLowerCase().includes(searchWilayah.toLowerCase()))
-                                .map((v) => (
-                                  <option key={v.id} value={v.id}>
-                                    {toTitleCase(v.name)}
-                                  </option>
-                                ))}
+                                .map((v) => {
+                                  const det = detectVillageType({
+                                    villageCode: v.id,
+                                    villageName: v.name,
+                                    regencyName: regRegency,
+                                    districtName: regDistrict,
+                                  });
+                                  return (
+                                    <option key={v.id} value={v.id}>
+                                      {det.fullName}
+                                    </option>
+                                  );
+                                })}
                             </select>
                           </div>
 
@@ -788,11 +810,11 @@ export const AuthView: React.FC<AuthViewProps> = ({
                         </div>
                       </div>
 
-                      {/* Klasifikasi Wilayah & Toggle Manual */}
+                      {/* Klasifikasi Wilayah Resmi Terkunci */}
                       <div className="pt-2 border-t border-emerald-200/80 flex items-center justify-between gap-2 flex-wrap">
                         <div className="flex items-center gap-1.5">
                           <span className="text-[10px] font-bold text-emerald-900">Klasifikasi Wilayah:</span>
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-bold ${
                             regVillageType === 'kelurahan'
                               ? 'bg-amber-100 text-amber-900 border border-amber-300'
                               : 'bg-emerald-200/80 text-emerald-900 border border-emerald-400'
@@ -801,30 +823,9 @@ export const AuthView: React.FC<AuthViewProps> = ({
                           </span>
                         </div>
 
-                        <div className="inline-flex bg-white/90 p-0.5 rounded-lg border border-emerald-300 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleVillageType('desa')}
-                            className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all ${
-                              regVillageType === 'desa'
-                                ? 'bg-emerald-700 text-white shadow-xs'
-                                : 'text-slate-600 hover:text-slate-900'
-                            }`}
-                          >
-                            Desa
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleVillageType('kelurahan')}
-                            className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all ${
-                              regVillageType === 'kelurahan'
-                                ? 'bg-emerald-700 text-white shadow-xs'
-                                : 'text-slate-600 hover:text-slate-900'
-                            }`}
-                          >
-                            Kelurahan
-                          </button>
-                        </div>
+                        <span className="text-[10px] font-semibold text-emerald-900 bg-white/80 px-2 py-0.5 rounded-md border border-emerald-300 shadow-2xs">
+                          ✓ Terverifikasi Kemendagri
+                        </span>
                       </div>
                     </div>
                   )}
@@ -843,8 +844,23 @@ export const AuthView: React.FC<AuthViewProps> = ({
                           type="text"
                           required
                           value={regVillage}
-                          onChange={(e) => setRegVillage(e.target.value)}
-                          placeholder="Contoh: Desa Sukamaju"
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setRegVillage(val);
+                            const det = detectVillageType({
+                              villageName: val,
+                              villageCode: regVillageCode,
+                              regencyName: regRegency,
+                              districtName: regDistrict,
+                            });
+                            if (det.type !== regVillageType && (val.toLowerCase().startsWith('kelurahan') || val.toLowerCase().startsWith('desa'))) {
+                              setRegVillageType(det.type);
+                              if (regRole === 'kades' || regRole === 'lurah') {
+                                setRegRole(det.leaderRole);
+                              }
+                            }
+                          }}
+                          placeholder="Contoh: Desa Sukamaju / Kelurahan Dodung"
                           className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-emerald-500"
                         />
                       </div>
@@ -853,8 +869,23 @@ export const AuthView: React.FC<AuthViewProps> = ({
                         <input
                           type="text"
                           value={regVillageCode}
-                          onChange={(e) => setRegVillageCode(e.target.value)}
-                          placeholder="Contoh: 32.01.01.2005"
+                          onChange={(e) => {
+                            const codeVal = e.target.value;
+                            setRegVillageCode(codeVal);
+                            const det = detectVillageType({
+                              villageCode: codeVal,
+                              villageName: regVillage,
+                              regencyName: regRegency,
+                              districtName: regDistrict,
+                            });
+                            if (det.type !== regVillageType && codeVal.length >= 7) {
+                              setRegVillageType(det.type);
+                              if (regRole === 'kades' || regRole === 'lurah') {
+                                setRegRole(det.leaderRole);
+                              }
+                            }
+                          }}
+                          placeholder="Contoh: 72.11.01.1007"
                           className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-semibold focus:bg-white focus:outline-none focus:border-emerald-500 font-mono"
                         />
                       </div>
@@ -938,6 +969,33 @@ export const AuthView: React.FC<AuthViewProps> = ({
                         </button>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Kode Referensi Mitra / Pendamping Daerah (Opsional) */}
+                  <div className="space-y-1 pt-1">
+                    <label className="font-bold text-slate-700 flex items-center justify-between text-xs">
+                      <span>Kode Referensi Mitra / Afiliasi (Opsional):</span>
+                      {regReferralCode ? (
+                        <span className="text-[10px] text-purple-700 font-bold bg-purple-100 px-2 py-0.5 rounded-full flex items-center gap-1 border border-purple-200">
+                          <Check className="w-3 h-3 text-purple-600" />
+                          Mitra Terhubung
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-medium">Kosongkan jika mandiri</span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={regReferralCode}
+                        onChange={(e) => setRegReferralCode(e.target.value.toUpperCase())}
+                        placeholder="Contoh: MITRA-JABAR"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 font-mono font-bold uppercase focus:bg-white focus:outline-none focus:border-emerald-500 placeholder:normal-case placeholder:font-sans placeholder:font-normal text-xs"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      Jika desa Anda mendapatkan sosialisasi/pendampingan dari agen resmi mitra daerah, masukkan kode di sini.
+                    </p>
                   </div>
 
                   {/* Checkbox Pakta Integritas */}

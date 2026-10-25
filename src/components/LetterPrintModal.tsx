@@ -149,7 +149,7 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({
         {/* Scrollable Printable Official Village Letter Area */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           <div 
-            className="printable-area bg-white text-slate-900 p-6 sm:p-10 border border-slate-200 rounded-xl shadow-sm"
+            className="printable-area bg-white text-slate-900 p-6 sm:p-10 border border-slate-200 rounded-xl shadow-sm relative overflow-hidden"
             style={{
               fontFamily:
                 headerConfig.font_family === 'Arial'
@@ -160,6 +160,13 @@ export const LetterPrintModal: React.FC<LetterPrintModalProps> = ({
               lineHeight: headerConfig.line_spacing || 1.5,
             }}
           >
+          {letter.status !== 'signed' && letter.status !== 'completed' && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 select-none overflow-hidden">
+              <div className="text-2xl sm:text-3xl md:text-4xl font-black text-rose-500/15 -rotate-35 border-4 border-dashed border-rose-500/20 px-6 py-4 rounded-3xl uppercase tracking-widest text-center max-w-[90%]">
+                DRAF BELUM SAH • MENUNGGU TTE RESMI
+              </div>
+            </div>
+          )}
           {/* Official Village Letterhead (KOP SURAT) */}
           <div className={`text-center mb-6 relative ${previewBorderClass}`}>
             {showGaruda && (

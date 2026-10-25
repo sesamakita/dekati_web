@@ -13,6 +13,7 @@ export interface VillageOfficial {
   nip?: string;
   nama_lengkap: string;
   email: string;
+  password?: string;
   role:
     | 'kades'
     | 'lurah'
@@ -282,6 +283,10 @@ export interface VillageProfile {
   logo_kabupaten_url?: string;
   logo_desa_url?: string;
   logo_provinsi_url?: string;
+  referral_code?: string;
+  referral_applied_at?: string;
+  subscription_plan?: 'trial' | 'monthly' | 'yearly';
+  trial_expires_at?: string;
 }
 
 export type LetterLogoLayout = 'standard_left' | 'dual_logo' | 'center_garuda' | 'no_logo';
@@ -321,4 +326,19 @@ export interface LetterTemplate {
   is_active?: boolean;
   updated_at?: string;
 }
+
+export type AuditLogCategory = 'surat' | 'kependudukan' | 'perangkat' | 'keuangan' | 'auth' | 'umum';
+
+export interface AuditLog {
+  id: string;
+  timestamp: string;
+  user_name: string;
+  user_role: string;
+  action: string;
+  category: AuditLogCategory;
+  description: string;
+  target_id?: string;
+  target_name?: string;
+}
+
 

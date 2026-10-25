@@ -1,5 +1,5 @@
 // src/components/VillageOfficialsManageModal.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X,
@@ -18,11 +18,19 @@ import {
   AlertTriangle,
   ExternalLink,
   ChevronRight,
-  UserPlus
+  UserPlus,
+  Upload,
+  Camera,
+  Image as ImageIcon,
+  Loader2,
+  KeyRound,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { VillageOfficial } from '../types';
 import { initialVillageOfficials } from '../data/mockData';
+import { supabase } from '../services/supabase';
 
 interface VillageOfficialsManageModalProps {
   isOpen: boolean;
@@ -65,9 +73,126 @@ export const VillageOfficialsManageModal: React.FC<VillageOfficialsManageModalPr
   const [formWhatsapp, setFormWhatsapp] = useState('');
   const [formPhone, setFormPhone] = useState('');
   const [formEmail, setFormEmail] = useState('');
+  const [formPassword, setFormPassword] = useState('');
+  const [showFormPassword, setShowFormPassword] = useState(false);
   const [formAvatar, setFormAvatar] = useState(DEFAULT_AVATARS[0]);
   const [formCanTte, setFormCanTte] = useState(false);
   const [formOrder, setFormOrder] = useState<number>(10);
+
+  // Photo upload from file state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+  const [photoUploadError, setPhotoUploadError] = useState<string | null>(null);
+
+  // Kompresi dan penyesuaian foto agar proporsional (square crop) dan ringan
+  const compressImage = (file: File, maxSize = 600): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Gagal membaca file foto.'));
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('Format berkas bukan gambar valid.'));
+        img.onload = () => {
+          const width = img.width;
+          const height = img.height;
+          const minDim = Math.min(width, height);
+          const startX = (width - minDim) / 2;
+          const startY = (height - minDim) / 2;
+
+          const canvas = document.createElement('canvas');
+          const targetDim = Math.min(maxSize, minDim);
+          canvas.width = targetDim;
+          canvas.height = targetDim;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(e.target?.result as string);
+            return;
+          }
+
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, startX, startY, minDim, minDim, 0, 0, targetDim, targetDim);
+
+          const compressed = canvas.toDataURL('image/jpeg', 0.85);
+          resolve(compressed);
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const processPhotoFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Mohon pilih berkas foto/gambar yang sah (JPG, JPEG, PNG, atau WebP).');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Ukuran file foto maksimal 10 MB.');
+      return;
+    }
+
+    setIsProcessingPhoto(true);
+    setPhotoUploadError(null);
+
+    try {
+      // 1. Dapatkan versi kompresi Base64 lokal yang ringan & proporsional
+      const compressedDataUri = await compressImage(file, 600);
+
+      // Tampilkan pratinjau instan langsung
+      setFormAvatar(compressedDataUri);
+
+      // 2. Unggah ke Supabase Storage (bucket: 'documents', path: 'officials/...')
+      try {
+        const fileExt = file.name.split('.').pop() || 'jpg';
+        const cleanExt = ['jpg', 'jpeg', 'png', 'webp'].includes(fileExt.toLowerCase())
+          ? fileExt.toLowerCase()
+          : 'jpg';
+        const fileName = `official_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${cleanExt}`;
+        const filePath = `officials/${fileName}`;
+
+        // Konversi Data URI ke Blob untuk upload Supabase Storage
+        const res = await fetch(compressedDataUri);
+        const blob = await res.blob();
+
+        const { error: uploadErr } = await supabase.storage
+          .from('documents')
+          .upload(filePath, blob, {
+            contentType: `image/${cleanExt === 'jpg' ? 'jpeg' : cleanExt}`,
+            upsert: true
+          });
+
+        if (!uploadErr) {
+          const { data: urlData } = supabase.storage.from('documents').getPublicUrl(filePath);
+          if (urlData?.publicUrl) {
+            setFormAvatar(urlData.publicUrl);
+          }
+        } else {
+          console.warn('[Dekati Storage] Upload fallback ke Data URI lokal:', uploadErr.message);
+        }
+      } catch (storageErr) {
+        console.warn('[Dekati Storage] Supabase Storage offline/error:', storageErr);
+      }
+    } catch (err: any) {
+      console.error('[Dekati Profile Photo] Error:', err);
+      setPhotoUploadError(err.message || 'Gagal memproses berkas foto.');
+      alert('Gagal memuat foto profil: ' + (err.message || 'Format tidak didukung'));
+    } finally {
+      setIsProcessingPhoto(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processPhotoFile(file);
+    }
+  };
 
   // Modal konfirmasi hapus
   const [deletingOfficial, setDeletingOfficial] = useState<VillageOfficial | null>(null);
@@ -85,9 +210,13 @@ export const VillageOfficialsManageModal: React.FC<VillageOfficialsManageModalPr
     setFormWhatsapp('');
     setFormPhone('');
     setFormEmail('');
+    setFormPassword('desa123456');
+    setShowFormPassword(false);
     setFormAvatar(DEFAULT_AVATARS[Math.floor(Math.random() * DEFAULT_AVATARS.length)]);
     setFormCanTte(false);
     setFormOrder(officials.length + 1);
+    setPhotoUploadError(null);
+    setIsProcessingPhoto(false);
     setIsEditing(true);
   }, [officials.length]);
 
@@ -101,9 +230,13 @@ export const VillageOfficialsManageModal: React.FC<VillageOfficialsManageModalPr
     setFormWhatsapp(official.whatsapp || official.phone_number || '');
     setFormPhone(official.phone_number || official.whatsapp || '');
     setFormEmail(official.email || '');
+    setFormPassword(official.password || '');
+    setShowFormPassword(false);
     setFormAvatar(official.avatar_url || DEFAULT_AVATARS[0]);
     setFormCanTte(!!official.can_sign_tte);
     setFormOrder(official.order_index ?? 10);
+    setPhotoUploadError(null);
+    setIsProcessingPhoto(false);
     setIsEditing(true);
   }, []);
 
@@ -175,6 +308,7 @@ export const VillageOfficialsManageModal: React.FC<VillageOfficialsManageModalPr
         whatsapp: formWhatsapp.trim() || undefined,
         phone_number: formPhone.trim() || formWhatsapp.trim() || undefined,
         email: formEmail.trim() || undefined,
+        password: formPassword.trim() || undefined,
         avatar_url: formAvatar.trim() || undefined,
         can_sign_tte: formCanTte,
         order_index: Number(formOrder) || 10
@@ -192,6 +326,7 @@ export const VillageOfficialsManageModal: React.FC<VillageOfficialsManageModalPr
         whatsapp: formWhatsapp.trim() || undefined,
         phone_number: formPhone.trim() || formWhatsapp.trim() || undefined,
         email: formEmail.trim() || `${formNama.toLowerCase().replace(/\s+/g, '')}@${profile.code || 'desa.id'}`,
+        password: formPassword.trim() || 'desa123456',
         village_code: profile.code || '32.01.1010.2003',
         village_name: profile.name || 'Desa Sukamaju',
         village_type: profile.village_type || 'desa',
@@ -421,42 +556,187 @@ export const VillageOfficialsManageModal: React.FC<VillageOfficialsManageModalPr
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:border-emerald-500 text-xs"
                     />
                   </div>
+                </div>
 
-                  {/* Email */}
-                  <div className="space-y-1">
-                    <label className="font-bold text-slate-700 block">Email Resmi Pamong</label>
-                    <input
-                      type="email"
-                      value={formEmail}
-                      onChange={(e) => setFormEmail(e.target.value)}
-                      placeholder="nama@desa.id"
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:border-emerald-500 text-xs"
-                    />
+                {/* Akun Login Portal Web DEKATI */}
+                <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-emerald-950 text-xs flex items-center gap-1.5">
+                      <KeyRound className="w-4 h-4 text-emerald-600" />
+                      <span>Kredensial Login Portal Staf</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200">
+                      Akses Web Terpadu
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="space-y-1">
+                      <label className="font-semibold text-slate-700 block">Email Login Resmi</label>
+                      <input
+                        type="email"
+                        value={formEmail}
+                        onChange={(e) => setFormEmail(e.target.value)}
+                        placeholder="nama@sukamaju.desa.id"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:border-emerald-500 text-xs"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="font-semibold text-slate-700 block">Kata Sandi (Password)</label>
+                        <button
+                          type="button"
+                          onClick={() => setFormPassword(`Desa${Math.floor(1000 + Math.random() * 9000)}!`)}
+                          className="text-[10px] text-emerald-700 hover:text-emerald-900 font-bold hover:underline"
+                        >
+                          Acak Sandi
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type={showFormPassword ? 'text' : 'password'}
+                          value={formPassword}
+                          onChange={(e) => setFormPassword(e.target.value)}
+                          placeholder="Minimal 6 karakter"
+                          className="w-full pl-3 pr-9 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:border-emerald-500 text-xs font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowFormPassword(!showFormPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                          title={showFormPassword ? "Sembunyikan Sandi" : "Lihat Sandi"}
+                        >
+                          {showFormPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Pilih Avatar Cepat & Otoritas TTE */}
-                <div className="p-3.5 bg-white rounded-2xl border border-slate-200/80 space-y-3">
+                {/* Foto Profil Pamong (Unggah Berkas & Preset) */}
+                <div className="p-4 bg-white rounded-2xl border border-slate-200/80 space-y-3.5">
                   <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-700 block">Pilihan Foto Profil / Avatar:</label>
-                    <div className="flex items-center gap-1 text-[11px] text-slate-500">
-                      <span>Pratinjau:</span>
-                      <img src={formAvatar} alt="preview" className="w-6 h-6 rounded-full object-cover border" />
+                    <label className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                      <Camera className="w-4 h-4 text-emerald-600" />
+                      <span>Foto Profil Pamong</span>
+                    </label>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      Bisa unggah foto pribadi atau gunakan avatar
+                    </span>
+                  </div>
+
+                  {/* Upload Box & Preview */}
+                  <div
+                    className="flex flex-col sm:flex-row items-center gap-4 p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 transition-colors hover:border-emerald-300"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const droppedFile = e.dataTransfer.files?.[0];
+                      if (droppedFile) processPhotoFile(droppedFile);
+                    }}
+                  >
+                    {/* Avatar Preview */}
+                    <div className="relative group shrink-0">
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white border-2 border-emerald-500/80 overflow-hidden shadow-sm flex items-center justify-center">
+                        {formAvatar ? (
+                          <img
+                            src={formAvatar}
+                            alt="Pratinjau Foto Pamong"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Users className="w-8 h-8 text-slate-400" />
+                        )}
+                        {isProcessingPhoto && (
+                          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[10px] gap-1 z-10">
+                            <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
+                            <span>Memproses...</span>
+                          </div>
+                        )}
+                      </div>
+                      {/* Click overlay */}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isProcessingPhoto}
+                        title="Klik untuk memilih foto dari berkas"
+                        className="absolute inset-0 rounded-2xl bg-slate-950/40 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-[10px] font-bold cursor-pointer"
+                      >
+                        <Camera className="w-4 h-4 mb-0.5" />
+                        <span>Ganti Foto</span>
+                      </button>
+                    </div>
+
+                    {/* Action buttons & info */}
+                    <div className="flex-1 space-y-2 text-center sm:text-left">
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                        {/* Hidden input file */}
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          accept="image/png,image/jpeg,image/webp,image/jpg"
+                          onChange={handlePhotoFileChange}
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isProcessingPhoto}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Ambil Foto dari File</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setFormAvatar(DEFAULT_AVATARS[0])}
+                          className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 font-semibold text-xs transition-colors"
+                          title="Gunakan avatar default"
+                        >
+                          <RotateCcw className="w-3 h-3 text-slate-500" />
+                          <span>Reset Avatar</span>
+                        </button>
+                      </div>
+
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Format yang didukung: <strong>JPG, PNG, atau WebP</strong> (maksimal 10 MB). Foto otomatis di-crop persegi &amp; dikompresi agar ringan di browser &amp; cloud Supabase.
+                      </p>
+                      {photoUploadError && (
+                        <p className="text-[11px] text-rose-600 font-semibold">
+                          {photoUploadError}
+                        </p>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                    {DEFAULT_AVATARS.map((av, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setFormAvatar(av)}
-                        className={`w-9 h-9 rounded-xl overflow-hidden border-2 shrink-0 transition-transform ${
-                          formAvatar === av ? 'border-emerald-500 scale-105' : 'border-transparent opacity-70 hover:opacity-100'
-                        }`}
-                      >
-                        <img src={av} alt="avatar" className="w-full h-full object-cover" />
-                      </button>
-                    ))}
+
+                  {/* Preset Avatar Standar */}
+                  <div className="pt-1 space-y-1.5">
+                    <span className="text-[11px] font-bold text-slate-600 block">
+                      Atau pilih dari koleksi avatar siap pakai:
+                    </span>
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                      {DEFAULT_AVATARS.map((av, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setFormAvatar(av)}
+                          className={`w-9 h-9 rounded-xl overflow-hidden border-2 shrink-0 transition-transform ${
+                            formAvatar === av
+                              ? 'border-emerald-500 scale-105 shadow-xs'
+                              : 'border-transparent opacity-60 hover:opacity-100 hover:scale-105'
+                          }`}
+                          title={`Avatar Standar ${idx + 1}`}
+                        >
+                          <img src={av} alt="avatar" className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   {/* Toggle Otoritas TTE */}

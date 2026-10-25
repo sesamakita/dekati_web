@@ -13,6 +13,7 @@ import {
   Check 
 } from 'lucide-react';
 import { LetterRequest } from '../types';
+import { MaskedNik } from './MaskedNik';
 
 interface QrVerifyModalProps {
   letter: LetterRequest;
@@ -97,9 +98,10 @@ export const QrVerifyModal: React.FC<QrVerifyModalProps> = ({ letter, onClose })
             <span className="text-slate-400 flex items-center gap-1.5">
               <User className="w-3.5 h-3.5" /> Pemohon / Warga:
             </span>
-            <span className="font-bold text-slate-800 text-right">
-              {letter.citizen_name} ({letter.citizen_nik})
-            </span>
+            <div className="font-bold text-slate-800 text-right flex items-center justify-end gap-1.5 flex-wrap">
+              <span>{letter.citizen_name}</span>
+              <span className="font-normal text-slate-500">(<MaskedNik nik={letter.citizen_nik} />)</span>
+            </div>
           </div>
           <div className="flex justify-between py-1 border-b border-slate-100">
             <span className="text-slate-400 flex items-center gap-1.5">

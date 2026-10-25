@@ -59,6 +59,9 @@ export function useData() {
     updateVillageEvent: dataService.updateVillageEvent.bind(dataService),
     deleteVillageEvent: dataService.deleteVillageEvent.bind(dataService),
     updateVillageProfile: dataService.updateVillageProfile.bind(dataService),
+    auditLogs: dataService.getAuditLogs(),
+    logAudit: dataService.logAudit.bind(dataService),
+    clearAuditLogs: dataService.clearAuditLogs.bind(dataService),
     syncFromSupabase: () => dataService.syncFromSupabase(),
     resetAllData: dataService.resetAllData.bind(dataService),
   };

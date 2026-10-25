@@ -451,11 +451,19 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-semibold focus:outline-none focus:border-emerald-500 disabled:opacity-50"
                   >
                     <option value="">-- Pilih Desa/Kelurahan --</option>
-                    {villages.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {toTitleCase(v.name)}
-                      </option>
-                    ))}
+                    {villages.map((v) => {
+                      const det = detectVillageType({
+                        villageCode: v.id,
+                        villageName: v.name,
+                        regencyName: regency,
+                        districtName: district,
+                      });
+                      return (
+                        <option key={v.id} value={v.id}>
+                          {det.fullName}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -476,30 +484,20 @@ export const VillageProfileModal: React.FC<VillageProfileModalProps> = ({ isOpen
                 <span>Identitas & Klasifikasi Wilayah</span>
               </h4>
 
-              {/* Toggle Desa vs Kelurahan */}
-              <div className="inline-flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => handleToggleVillageType('desa')}
-                  className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
-                    villageType === 'desa'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  🏛️ Desa
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleToggleVillageType('kelurahan')}
-                  className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
-                    villageType === 'kelurahan'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  🏢 Kelurahan
-                </button>
+              {/* Status Klasifikasi Wilayah Resmi Terkunci Kemendagri */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold shadow-xs border ${
+                  villageType === 'kelurahan'
+                    ? 'bg-amber-50 text-amber-900 border-amber-300'
+                    : 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                }`}>
+                  {villageType === 'kelurahan' ? '🏢 Kelurahan (PNS/ASN)' : '🏛️ Desa (Otonom)'}
+                </span>
+                {code && (
+                  <span className="text-[11px] font-mono bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg font-semibold border border-slate-200">
+                    Kode Kemendagri: {code}
+                  </span>
+                )}
               </div>
             </div>
 

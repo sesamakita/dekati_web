@@ -478,9 +478,33 @@ export function renderFullLetterHtml(params: {
       color: #6b7280;
       margin: 2px 0 0 0;
     }
+    .watermark-draft {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-35deg);
+      font-size: 34px;
+      font-weight: 900;
+      color: rgba(220, 38, 38, 0.12);
+      border: 4px dashed rgba(220, 38, 38, 0.22);
+      padding: 16px 28px;
+      border-radius: 20px;
+      pointer-events: none;
+      z-index: 9999;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 2.5px;
+      font-family: Arial, sans-serif;
+      width: 85%;
+    }
   </style>
 </head>
 <body>
+  ${letter.status !== 'signed' && letter.status !== 'completed' ? `
+    <div class="watermark-draft">
+      DRAF BELUM SAH • MENUNGGU TTE RESMI
+    </div>
+  ` : ''}
   <div class="kop">
     ${showGaruda ? `
       <div style="text-align: center; margin-bottom: 8px;">

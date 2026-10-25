@@ -27,9 +27,11 @@ import { ApbdesManageModal } from '../components/ApbdesManageModal';
 import { VillageOfficialsManageModal } from '../components/VillageOfficialsManageModal';
 import { NeighborhoodUnitsManageModal } from '../components/NeighborhoodUnitsManageModal';
 import { VillageOfficial } from '../types';
+import { canManageOfficials } from '../utils/rbac';
 
 export const ApbdesView: React.FC = () => {
-  const { apbdes, profile, officials, deleteApbdesItem, deleteOfficial } = useData();
+  const { apbdes, profile, officials, deleteApbdesItem, deleteOfficial, currentOfficial, activeRole } = useData();
+  const canEditPamong = !currentOfficial || canManageOfficials(currentOfficial) || activeRole === 'admin_desa' || activeRole === 'kades';
 
   // Modals state
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -46,6 +48,7 @@ export const ApbdesView: React.FC = () => {
   };
 
   const surplusDefisit = (apbdes.pendapatan?.total_realized || 0) - (apbdes.belanja?.total_realized || 0);
+  const isKelurahan = profile.village_type === 'kelurahan';
 
   return (
     <div className="space-y-6 pb-12 animate-fade-in">
@@ -54,10 +57,12 @@ export const ApbdesView: React.FC = () => {
         <div>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
             <PieChart className="w-5 h-5 text-violet-600" />
-            Transparansi APBDes & Profil Pemerintahan Desa
+            {isKelurahan ? 'Transparansi Anggaran & Profil Kelurahan' : 'Transparansi APBDes & Profil Pemerintahan Desa'}
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Publikasi anggaran pendapatan & belanja desa tahun {apbdes.fiscal_year} serta identitas wilayah kerja {profile.name}.
+            {isKelurahan
+              ? `Publikasi anggaran & realisasi belanja kelurahan tahun ${apbdes.fiscal_year} serta identitas wilayah kerja ${profile.name}.`
+              : `Publikasi anggaran pendapatan & belanja desa tahun ${apbdes.fiscal_year} serta identitas wilayah kerja ${profile.name}.`}
           </p>
         </div>
 
@@ -103,7 +108,7 @@ export const ApbdesView: React.FC = () => {
         <div className="bento-card p-5 bg-gradient-to-br from-emerald-50/70 to-teal-50/40 border-emerald-200/80 relative overflow-visible">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider block">
-              Total Pendapatan Desa
+              Total Pendapatan {isKelurahan ? 'Kelurahan' : 'Desa'}
             </span>
             {/* Ubah Target Button */}
             <div className="relative group/tooltip inline-block">
@@ -125,7 +130,7 @@ export const ApbdesView: React.FC = () => {
             Rp {(apbdes.pendapatan?.total_realized || 0).toLocaleString('id-ID')}
           </div>
           <p className="text-xs text-emerald-700 mt-1">
-            Target APBDes: Rp {(apbdes.pendapatan?.total_budget || 0).toLocaleString('id-ID')}
+            Target {isKelurahan ? 'Anggaran' : 'APBDes'}: Rp {(apbdes.pendapatan?.total_budget || 0).toLocaleString('id-ID')}
           </p>
           <div className="mt-3 w-full bg-emerald-200/60 h-2 rounded-full overflow-hidden">
             <div
@@ -507,37 +512,47 @@ export const ApbdesView: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedOfficialForEdit(null);
-                setIsAddOfficialMode(true);
-                setIsOfficialsModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs hover:scale-105 active:scale-95"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Tambah Pamong</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedOfficialForEdit(null);
-                setIsAddOfficialMode(false);
-                setIsOfficialsModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              <span>Susunan Lengkap</span>
-            </button>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {canEditPamong && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedOfficialForEdit(null);
+                    setIsAddOfficialMode(true);
+                    setIsOfficialsModalOpen(true);
+                  }}
+                  title="Tambah Pamong & Buatkan Akun"
+                  aria-label="Tambah Pamong"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all shadow-sm hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Tambah Pamong</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedOfficialForEdit(null);
+                    setIsAddOfficialMode(false);
+                    setIsOfficialsModalOpen(true);
+                  }}
+                  title="Susunan Lengkap & Kelola Akun"
+                  aria-label="Susunan Lengkap"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                >
+                  <Edit3 className="w-4 h-4" />
+                  <span>Susunan Lengkap</span>
+                </button>
+              </>
+            )}
             <button
               type="button"
               onClick={() => setIsRtModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-xs font-bold transition-colors"
+              title="Kelola Basis Data Wilayah RT & RW"
+              aria-label="Wilayah RT & RW"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 font-bold text-xs transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
-              <Building2 className="w-3.5 h-3.5 text-blue-600" />
+              <Building2 className="w-4 h-4 text-blue-600" />
               <span>Wilayah RT &amp; RW</span>
             </button>
           </div>
@@ -585,36 +600,38 @@ export const ApbdesView: React.FC = () => {
                     </div>
 
                     {/* Quick Action: Edit & Hapus Pamong */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedOfficialForEdit(official);
-                          setIsAddOfficialMode(false);
-                          setIsOfficialsModalOpen(true);
-                        }}
-                        className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition-colors"
-                        title="Edit Data Pamong"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `Apakah Anda yakin ingin menghapus pamong "${official.nama_lengkap}" (${official.jabatan || official.role}) dari susunan organisasi desa?`
-                            )
-                          ) {
-                            deleteOfficial(official.id);
-                          }
-                        }}
-                        className="p-1.5 rounded-lg bg-white border border-slate-200 text-rose-500 hover:text-rose-700 hover:bg-rose-50 hover:border-rose-300 transition-colors"
-                        title="Hapus Pamong"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    {canEditPamong && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedOfficialForEdit(official);
+                            setIsAddOfficialMode(false);
+                            setIsOfficialsModalOpen(true);
+                          }}
+                          className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition-colors"
+                          title="Edit Data & Akun Pamong"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `Apakah Anda yakin ingin menghapus pamong "${official.nama_lengkap}" (${official.jabatan || official.role}) dari susunan organisasi desa?`
+                              )
+                            ) {
+                              deleteOfficial(official.id);
+                            }
+                          }}
+                          className="p-1.5 rounded-lg bg-white border border-slate-200 text-rose-500 hover:text-rose-700 hover:bg-rose-50 hover:border-rose-300 transition-colors"
+                          title="Hapus Pamong"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-3 pt-2.5 border-t border-slate-200/60 flex items-center justify-between text-[11px]">

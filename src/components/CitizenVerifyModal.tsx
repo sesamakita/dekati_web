@@ -26,6 +26,8 @@ import {
 import { Citizen } from '../types';
 import { useData } from '../hooks/useData';
 import { resolveCitizenDocInfo } from '../services/docUtils';
+import { MaskedNik } from './MaskedNik';
+import { useHorizontalScroll } from '../hooks/useHorizontalScroll';
 
 interface CitizenVerifyModalProps {
   citizen: Citizen;
@@ -39,6 +41,7 @@ export const CitizenVerifyModal: React.FC<CitizenVerifyModalProps> = ({ citizen,
   const [rejectError, setRejectError] = useState('');
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const headerScrollRef = useHorizontalScroll<HTMLDivElement>();
 
   // Update activeCitizen when prop citizen changes
   useEffect(() => {
@@ -133,37 +136,41 @@ export const CitizenVerifyModal: React.FC<CitizenVerifyModalProps> = ({ citizen,
       >
         
         {/* Fixed Header Bar */}
-        <div className="shrink-0 px-6 py-4 border-b border-slate-100 flex items-start justify-between bg-white">
-          <div>
-            <div className="flex flex-wrap items-center gap-2 mb-1.5">
-              <span className="font-mono text-xs font-bold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-lg border border-sky-200">
-                NIK: {activeCitizen.nik}
+        <div className="shrink-0 px-6 py-4 border-b border-slate-100 flex items-start justify-between bg-white overflow-hidden">
+          <div className="min-w-0 pr-4 flex-1 overflow-hidden">
+            <div
+              ref={headerScrollRef}
+              className="w-full min-w-0 flex items-center gap-2 mb-1.5 badge-scroll-container pb-1 cursor-grab active:cursor-grabbing select-none touch-pan-x"
+            >
+              <span className="shrink-0 font-mono text-xs font-bold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-lg border border-sky-200 inline-flex items-center gap-1 whitespace-nowrap">
+                <span>NIK:</span>
+                <MaskedNik nik={activeCitizen.nik} showCopy />
               </span>
-              <span className="font-mono text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg">
+              <span className="shrink-0 font-mono text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg whitespace-nowrap">
                 KK: {activeCitizen.no_kk || 'Belum diisi'}
               </span>
               {activeCitizen.is_verified ? (
-                <span className="badge-pill bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="shrink-0 badge-pill bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
                   <CheckCircle className="w-3 h-3 text-emerald-600" />
                   Terverifikasi
                 </span>
               ) : isPreviousRevision ? (
-                <span className="badge-pill bg-rose-50 text-rose-700 border border-rose-200">
+                <span className="shrink-0 badge-pill bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
                   <AlertCircle className="w-3 h-3 text-rose-600" />
                   Perlu Revisi Dokumen
                 </span>
               ) : (
-                <span className="badge-pill bg-amber-50 text-amber-700 border border-amber-200">
+                <span className="shrink-0 badge-pill bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
                   <ShieldAlert className="w-3 h-3 text-amber-600" />
                   Menunggu Verifikasi
                 </span>
               )}
               {hasAnyDoc ? (
-                <span className="badge-pill bg-sky-50 text-sky-700 border border-sky-200">
+                <span className="shrink-0 badge-pill bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap">
                   {isHeadOfFamily ? (hasKtp ? 'Foto KTP Dilampirkan' : 'Dokumen Fisik Ada') : 'Berkas Anggota Keluarga Ada'}
                 </span>
               ) : (
-                <span className="badge-pill bg-slate-100 text-slate-500 border border-slate-200">
+                <span className="shrink-0 badge-pill bg-slate-100 text-slate-500 border border-slate-200 whitespace-nowrap">
                   Belum Lampirkan Berkas
                 </span>
               )}
@@ -177,7 +184,7 @@ export const CitizenVerifyModal: React.FC<CitizenVerifyModalProps> = ({ citizen,
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
@@ -240,9 +247,13 @@ export const CitizenVerifyModal: React.FC<CitizenVerifyModalProps> = ({ citizen,
                         <span className={`w-2 h-2 rounded-full ${member.is_verified ? 'bg-emerald-500' : 'bg-amber-400'}`} />
                         <div>
                           <span className="text-slate-900">{member.nama_lengkap}</span>
-                          <span className="text-[11px] text-slate-500 ml-1.5 font-normal">
-                            ({member.status_dalam_keluarga || 'Anggota'}) • NIK: {member.nik}
-                          </span>
+                          <div className="text-[11px] text-slate-500 font-normal flex items-center gap-1.5 flex-wrap">
+                            <span>({member.status_dalam_keluarga || 'Anggota'})</span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1">
+                              NIK: <MaskedNik nik={member.nik} className="text-[11px]" />
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>

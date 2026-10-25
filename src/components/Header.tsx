@@ -9,11 +9,16 @@ import {
   Search,
   Globe,
   LogOut,
-  QrCode
+  QrCode,
+  Lock,
+  Menu,
+  History
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
+import { useNikPrivacy } from '../context/NikPrivacyContext';
 import { VillageProfileModal } from './VillageProfileModal';
 import { VillageQrModal } from './VillageQrModal';
+import { AuditLogModal } from './AuditLogModal';
 import { DEFAULT_DESA_LOGO_DATA_URI } from '../utils/letterTemplateEngine';
 
 interface HeaderProps {
@@ -21,13 +26,23 @@ interface HeaderProps {
   onOpenNotifications?: () => void;
   onOpenLanding?: () => void;
   onLogout?: () => void;
+  isSidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onSearchChange, onOpenLanding, onLogout }) => {
-  const { profile, activeRole, setActiveRole, letters, complaints, citizens } = useData();
+export const Header: React.FC<HeaderProps> = ({ 
+  onSearchChange, 
+  onOpenLanding, 
+  onLogout,
+  isSidebarCollapsed,
+  onToggleSidebar
+}) => {
+  const { profile, activeRole, setActiveRole, letters, complaints, citizens, currentOfficial } = useData();
   const [timeStr, setTimeStr] = useState('');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
+  const { isSessionUnlocked, lockAll } = useNikPrivacy();
 
   useEffect(() => {
     const updateTime = () => {
@@ -58,12 +73,25 @@ export const Header: React.FC<HeaderProps> = ({ onSearchChange, onOpenLanding, o
   return (
     <header className="shrink-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-6 py-3.5 transition-all">
       <div className="w-full flex items-center justify-between gap-4">
-        {/* Village Identity & Emblem */}
-        <div 
-          onClick={() => setIsProfileModalOpen(true)}
-          className="flex items-center gap-3.5 cursor-pointer group/header-profile p-1 -m-1 rounded-2xl hover:bg-slate-100/70 transition-all select-none"
-          title="Klik untuk Kelola Profil & Logo Desa"
-        >
+        {/* Toggle Sidebar & Village Identity */}
+        <div className="flex items-center gap-2.5 sm:gap-3.5">
+          {onToggleSidebar && (
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              className="p-2 -ml-2 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 active:bg-emerald-100 rounded-xl transition-all focus:outline-none shrink-0 border border-transparent hover:border-emerald-200/80 cursor-pointer"
+              title={isSidebarCollapsed ? "Perluas Menu Sidebar" : "Ciutkan Menu Sidebar (Hanya Ikon)"}
+              aria-label="Toggle Sidebar"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
+
+          <div 
+            onClick={() => setIsProfileModalOpen(true)}
+            className="flex items-center gap-3.5 cursor-pointer group/header-profile p-1 -m-1 rounded-2xl hover:bg-slate-100/70 transition-all select-none"
+            title="Klik untuk Kelola Profil & Logo Desa"
+          >
           <div className="w-11 h-11 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center overflow-hidden relative group-hover/header-profile:scale-105 group-hover/header-profile:border-emerald-500 transition-all shrink-0">
             {profile.logo_desa_url ? (
               <img 
@@ -97,6 +125,7 @@ export const Header: React.FC<HeaderProps> = ({ onSearchChange, onOpenLanding, o
             </p>
           </div>
         </div>
+      </div>
 
         {/* Global Search */}
         <div className="hidden md:flex flex-1 max-w-md mx-4">
@@ -122,32 +151,61 @@ export const Header: React.FC<HeaderProps> = ({ onSearchChange, onOpenLanding, o
             </div>
           </div>
 
-          {/* Role Switcher Pill */}
-          <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200/70">
+          {/* Role Switcher jika belum ada akun spesifik yang login */}
+          {!currentOfficial && (
+            <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200/70">
+              <button
+                onClick={() => setActiveRole('admin_desa')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeRole === 'admin_desa'
+                    ? 'bg-white text-emerald-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Akses Operator Pelayanan Desa (Verifikasi Berkas & Disposisi)"
+              >
+                <UserCog className="w-3.5 h-3.5" />
+                <span>Operator</span>
+              </button>
+              <button
+                onClick={() => setActiveRole('kades')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  activeRole === 'kades'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Akses Kepala Desa (Otoritas TTE QR Code & Kebijakan)"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Kades (TTE)</span>
+              </button>
+            </div>
+          )}
+
+          {/* Sesi Akses NIK Terbuka (Quick Lock Button) */}
+          {isSessionUnlocked && (
             <button
-              onClick={() => setActiveRole('admin_desa')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                activeRole === 'admin_desa'
-                  ? 'bg-white text-emerald-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-              title="Akses Operator Pelayanan Desa (Verifikasi Berkas & Disposisi)"
+              onClick={lockAll}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition-all shadow-xs cursor-pointer animate-fade-in"
+              title="Sesi NIK terbuka (15 menit). Klik untuk mengunci kembali seluruh NIK kependudukan."
             >
-              <UserCog className="w-3.5 h-3.5" />
-              <span>Operator</span>
+              <Lock className="w-3.5 h-3.5 text-amber-700" />
+              <span className="hidden sm:inline">Kunci NIK</span>
             </button>
+          )}
+
+          {/* Audit Trail & Rekam Jejak Sistem */}
+          <div className="relative group/tooltip inline-block">
             <button
-              onClick={() => setActiveRole('kades')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                activeRole === 'kades'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-              title="Akses Kepala Desa (Otoritas TTE QR Code & Kebijakan)"
+              onClick={() => setIsAuditModalOpen(true)}
+              aria-label="Audit Trail & Rekam Jejak Sistem"
+              className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200/70 border border-slate-200/80 flex items-center justify-center text-slate-700 transition-all shadow-sm hover:scale-105 active:scale-95"
             >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Kades (TTE)</span>
+              <History className="w-4 h-4 text-slate-600" />
             </button>
+            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1.5 bg-slate-950 text-white text-xs font-semibold rounded-xl shadow-2xl backdrop-blur-md pointer-events-none opacity-0 group-hover/tooltip:opacity-100 group-hover/tooltip:translate-y-0.5 transition-all duration-200 whitespace-nowrap z-50 border border-white/10">
+              Buku Audit Trail & Rekam Jejak
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 -mb-px border-4 border-transparent border-b-slate-950"></div>
+            </div>
           </div>
 
           {/* QR Registrasi Warga */}
@@ -230,6 +288,12 @@ export const Header: React.FC<HeaderProps> = ({ onSearchChange, onOpenLanding, o
       <VillageQrModal
         isOpen={isQrModalOpen}
         onClose={() => setIsQrModalOpen(false)}
+      />
+
+      {/* Modal Audit Trail & Rekam Jejak Sistem */}
+      <AuditLogModal
+        isOpen={isAuditModalOpen}
+        onClose={() => setIsAuditModalOpen(false)}
       />
     </header>
   );

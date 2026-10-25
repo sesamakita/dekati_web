@@ -193,18 +193,24 @@ Konfirmasi Anda otomatis tersinkronisasi ke Kantor Desa secara instan. Terima ka
   // Kirim Update Status Surat ke Warga Pemohon
   async sendCitizenStatusNotification(
     letter: LetterRequest,
-    customMessage?: string
+    customMessage?: string,
+    overridePhone?: string
   ): Promise<{ success: boolean; error?: string }> {
-    const phone = letter.applicant_phone;
+    const phone = overridePhone || letter.applicant_phone;
     if (!phone) {
       return { success: false, error: 'Nomor WhatsApp pemohon tidak tersedia.' };
     }
 
     let statusText = '';
+    const verifyUrl = letter.qr_verification_url || (letter.qr_verification_token ? `https://dekati.desa.id/verify?token=${letter.qr_verification_token}` : '');
+
     if (letter.status === 'signed' || letter.status === 'completed') {
-      statusText = '✅ *SURAT RESMI TELAH DISAHKAN & DITERBITKAN* dengan Tanda Tangan Elektronik (TTE QR) Kepala Desa.';
+      statusText = `✅ *SURAT RESMI TELAH DISAHKAN & DITERBITKAN*
+Surat Anda telah ditandatangani secara elektronik (TTE QR) resmi oleh Kepala Desa/Lurah dan berkas dokumen siap diunduh.
+${letter.letter_official_number ? `• No. Registrasi: *${letter.letter_official_number}*` : ''}
+${verifyUrl ? `• Cek Keaslian & Unduh: ${verifyUrl}` : ''}`;
     } else if (letter.status === 'approved') {
-      statusText = '📋 Berkas telah diverifikasi lengkap dan telah diterbitkan Nomor Registrasi Resmi Desa. Menunggu pengesahan TTE Kades.';
+      statusText = `📋 Berkas telah diverifikasi lengkap dan telah diterbitkan Nomor Registrasi Resmi Desa${letter.letter_official_number ? ` (*${letter.letter_official_number}*)` : ''}. Menunggu pengesahan TTE Kades/Lurah.`;
     } else if (letter.status === 'submitted' && letter.rt_status === 'approved_by_rt') {
       statusText = '👍 Rekomendasi Ketua RT telah *DISETUJUI*. Berkas Anda kini sedang dalam antrean verifikasi kantor desa.';
     } else if (letter.status === 'rejected') {
@@ -212,18 +218,16 @@ Konfirmasi Anda otomatis tersinkronisasi ke Kantor Desa secara instan. Terima ka
     }
 
     const message = 
-`🏛️ *LAYANAN E-SURAT DESA - DEKATI*
+`🏛️ *LAYANAN E-SURAT DESA - SISTEM DEKATI*
 Halo Sdr/i *${letter.citizen_name}*,
 
-Status permohonan surat Anda telah diperbarui:
+Pemberitahuan status permohonan surat administrasi Anda:
 • No. Pelacakan: *${letter.tracking_number}*
-• Jenis Surat: *${letter.letter_name}*
+• Jenis Dokumen: *${letter.letter_name}*
 
 ${statusText}
-
-${customMessage ? `\nCatatan Tambahan: ${customMessage}` : ''}
-
-Anda dapat memantau perkembangan dan mengunduh surat resmi langsung melalui aplikasi mobile DEKATI. Terima kasih.`;
+${customMessage ? `\n📌 *Catatan Tambahan:*\n${customMessage}\n` : ''}
+Anda dapat memverifikasi barcode QR dan mengunduh berkas surat secara mandiri melalui aplikasi DEKATI. Terima kasih.`;
 
     return await this.sendTextMessage(phone, message);
   }
