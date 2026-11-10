@@ -30,9 +30,10 @@ import {
 
 interface LandingPageViewProps {
   onEnterAdmin: () => void;
+  onQuickDemo?: (mode: 'desa' | 'kelurahan') => void;
 }
 
-export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterAdmin }) => {
+export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterAdmin, onQuickDemo }) => {
   const {
     profile: currentProfile,
     officials: currentOfficials,
@@ -67,6 +68,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onEnterAdmin }
         onEnterAdmin={onEnterAdmin}
         onOpenDownloadModal={() => setIsDownloadModalOpen(true)}
         profile={profile}
+        onQuickDemo={onQuickDemo}
       />
 
       {/* 3. Profil Desa / Kelurahan (Identitas & Visi Misi) */}

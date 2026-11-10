@@ -14,7 +14,8 @@ import {
   Calendar,
   PanelLeftClose,
   PanelLeftOpen,
-  Info
+  Info,
+  Sparkles
 } from 'lucide-react';
 import { useData } from '../hooks/useData';
 import { CustomDialog } from './CustomDialog';
@@ -38,8 +39,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed = false,
   onToggleCollapse
 }) => {
-  const { letters, complaints, citizens, resetAllData, currentOfficial, profile } = useData();
+  const { letters, complaints, citizens, resetAllData, currentOfficial, profile, seedShowcaseData, demoMode } = useData();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showSeedConfirm, setShowSeedConfirm] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
 
   const permittedTabs = useMemo(() => getPermittedTabs(currentOfficial), [currentOfficial]);
@@ -307,6 +309,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </span>
         </button>
 
+        {/* Muat Data Contoh Presentasi button */}
+        <button
+          onClick={() => setShowSeedConfirm(true)}
+          title="Muat Data Contoh Presentasi (Isi Data Lengkap)"
+          className={`w-full flex items-center rounded-xl transition-all cursor-pointer ${
+            isCollapsed
+              ? 'w-12 h-12 mx-auto justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 p-0'
+              : 'justify-center gap-2 py-1.5 px-3 text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50/70 hover:bg-indigo-100 border border-indigo-200/60'
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+          <span className={`whitespace-nowrap transition-opacity duration-150 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
+            Muat Data Presentasi
+          </span>
+        </button>
+
         {/* Reset Mock Data button */}
         <button
           onClick={() => setShowResetConfirm(true)}
@@ -331,7 +349,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Confirmation Dialog */}
+      {/* Confirmation Dialog Reset */}
       <CustomDialog
         isOpen={showResetConfirm}
         onClose={() => setShowResetConfirm(false)}
@@ -342,6 +360,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         cancelText="Batal"
         showCancel={true}
         onConfirm={() => resetAllData()}
+      />
+
+      {/* Confirmation Dialog Muat Data Presentasi */}
+      <CustomDialog
+        isOpen={showSeedConfirm}
+        onClose={() => setShowSeedConfirm(false)}
+        type="info"
+        title="Muat Data Contoh Presentasi"
+        message={`Apakah Anda ingin memuat paket data simulasi super lengkap (20+ warga, surat TTE, aduan foto, dan grafik APBDes) ke wilayah ${profile.name || 'ini'}? Fitur ini sangat ideal untuk mendemonstrasikan keunggulan sistem ke pimpinan / calon pengguna.`}
+        confirmText="Ya, Muat Data Lengkap"
+        cancelText="Batal"
+        showCancel={true}
+        onConfirm={() => seedShowcaseData()}
       />
       {/* Modal Tentang Aplikasi */}
       <AboutAppModal

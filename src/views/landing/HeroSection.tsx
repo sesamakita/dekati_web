@@ -18,12 +18,14 @@ interface HeroSectionProps {
   onEnterAdmin: () => void;
   onOpenDownloadModal: () => void;
   profile?: VillageProfile;
+  onQuickDemo?: (mode: 'desa' | 'kelurahan') => void;
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
   onEnterAdmin,
   onOpenDownloadModal,
   profile,
+  onQuickDemo,
 }) => {
   return (
     <section id="hero" className="relative pt-12 pb-20 overflow-hidden">
@@ -97,6 +99,34 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               <Search className="w-4 h-4 text-slate-400" />
               <span>Lacak Surat Mandiri</span>
             </a>
+          </div>
+
+          {/* Quick Demo Pill Bar for Prospective Users */}
+          <div className="pt-2 flex justify-center">
+            <div className="inline-flex items-center gap-2.5 p-2 px-4 bg-white/95 border border-indigo-200/90 rounded-2xl shadow-sm text-xs backdrop-blur-md flex-wrap justify-center animate-fade-in">
+              <span className="inline-flex items-center gap-1.5 font-extrabold text-slate-800">
+                <Sparkles className="w-4 h-4 text-indigo-600 animate-pulse" />
+                <span>Coba Demo Interaktif (1-Click):</span>
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onQuickDemo ? onQuickDemo('desa') : onEnterAdmin()}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold border border-emerald-300 transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-xs flex items-center gap-1"
+                >
+                  <span>🌾</span>
+                  <span>Versi Desa Sukamaju</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onQuickDemo ? onQuickDemo('kelurahan') : onEnterAdmin()}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-900 font-bold border border-indigo-300 transition-all cursor-pointer hover:scale-105 active:scale-95 shadow-xs flex items-center gap-1"
+                >
+                  <span>🏛️</span>
+                  <span>Versi Kel. Menteng Asri</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Mini Trust Points */}

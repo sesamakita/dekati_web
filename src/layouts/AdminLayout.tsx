@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { Sidebar, NavTab } from '../components/Sidebar';
+import { DemoModeBanner } from '../components/DemoModeBanner';
 import { dataService } from '../services/dataService';
 import { getPermittedTabs } from '../utils/rbac';
 
@@ -75,6 +76,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         isSidebarCollapsed={isSidebarCollapsed}
         onToggleSidebar={handleToggleSidebar}
       />
+
+      {/* Floating Interactive Demo Simulation Banner (if in demo mode) */}
+      <DemoModeBanner />
 
       {/* Main Layout Container */}
       <div className="flex-1 flex overflow-hidden w-full">

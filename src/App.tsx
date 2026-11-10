@@ -34,7 +34,10 @@ const ViewLoader: React.FC = () => (
 );
 
 // Wrapper for Landing Page
-const LandingPageWrapper: React.FC<{ isAuthenticated: boolean }> = ({ isAuthenticated }) => {
+const LandingPageWrapper: React.FC<{ 
+  isAuthenticated: boolean;
+  onLoginSuccess: (role: 'admin_desa' | 'kades', userEmail?: string) => void;
+}> = ({ isAuthenticated, onLoginSuccess }) => {
   const navigate = useNavigate();
   const handleEnterAdmin = () => {
     if (isAuthenticated) {
@@ -43,7 +46,12 @@ const LandingPageWrapper: React.FC<{ isAuthenticated: boolean }> = ({ isAuthenti
       navigate('/login');
     }
   };
-  return <LandingPageView onEnterAdmin={handleEnterAdmin} />;
+  const handleQuickDemo = (mode: 'desa' | 'kelurahan') => {
+    dataService.loadDemoAccount(mode);
+    onLoginSuccess('kades', mode === 'kelurahan' ? 'lurah@mentengasri.kel.id' : 'kades@sukamaju.desa.id');
+    navigate('/admin/dashboard');
+  };
+  return <LandingPageView onEnterAdmin={handleEnterAdmin} onQuickDemo={handleQuickDemo} />;
 };
 
 // Wrapper for Auth Page
@@ -98,7 +106,7 @@ export const App: React.FC = () => {
           {/* Public Landing Page */}
         <Route
           path="/"
-          element={<LandingPageWrapper isAuthenticated={isAuthenticated} />}
+          element={<LandingPageWrapper isAuthenticated={isAuthenticated} onLoginSuccess={handleLoginSuccess} />}
         />
 
         {/* Public QR Code Letter Verification */}

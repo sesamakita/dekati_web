@@ -26,7 +26,11 @@ import {
   initialEmergencyContacts,
   initialVillageEvents,
   initialNeighborhoodUnits,
-  initialVillageOfficials
+  initialVillageOfficials,
+  initialKelurahanProfile,
+  initialKelurahanOfficials,
+  initialKelurahanApbdes,
+  initialKelurahanNeighborhoodUnits
 } from '../data/mockData';
 import { supabase } from './supabase';
 import { DEFAULT_TEMPLATES } from '../utils/letterTemplateEngine';
@@ -45,7 +49,8 @@ const STORAGE_KEYS = {
   OFFICIALS_LIST: 'dekati_officials_list_v1',
   LETTER_TEMPLATES: 'dekati_letter_templates_v1',
   NEIGHBORHOOD_UNITS: 'dekati_neighborhood_units_v1',
-  AUDIT_LOGS: 'dekati_audit_logs_v1'
+  AUDIT_LOGS: 'dekati_audit_logs_v1',
+  DEMO_MODE: 'dekati_demo_mode_v1'
 };
 
 export const defaultOfficials: VillageOfficial[] = initialVillageOfficials;
@@ -175,7 +180,8 @@ class DataService {
   // Fallback bersih untuk desa / kelurahan nyata yang baru didaftarkan (bukan akun demo)
   private getTenantCleanFallback<T>(key: string, defaultFallback: T): T {
     const code = this.getActiveVillageCode();
-    if (!code || code === '320110102003') {
+    // Jika tidak ada kode, akun demo desa (320110102003), akun demo kelurahan (3271011001), atau sedang dalam mode demo
+    if (!code || code === '320110102003' || code === '3271011001' || this.getDemoMode()) {
       return defaultFallback;
     }
 
@@ -312,6 +318,11 @@ class DataService {
 
   // Sync data from Supabase
   async syncFromSupabase() {
+    // Mode demo harus 100% independen dan terlindungi dari data DB Supabase
+    if (this.getDemoMode()) {
+      return;
+    }
+
     try {
       const currentOfficial = this.getCurrentOfficial();
       const currentLocalProfile = this.getVillageProfile();
@@ -2532,8 +2543,121 @@ class DataService {
     this.cache = {};
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(STORAGE_KEYS.CURRENT_OFFICIAL);
+      localStorage.removeItem(STORAGE_KEYS.DEMO_MODE);
     }
     this.notify();
+  }
+
+  // Demo Simulation Account Loader (Versi Desa vs Kelurahan)
+  loadDemoAccount(mode: 'desa' | 'kelurahan' = 'desa') {
+    this.cache = {};
+
+    if (mode === 'kelurahan') {
+      const lurah = initialKelurahanOfficials[0];
+      const kelCode = '3271011001';
+
+      this.cache[STORAGE_KEYS.CURRENT_OFFICIAL] = lurah;
+      this.cache[STORAGE_KEYS.PROFILE] = initialKelurahanProfile;
+      this.cache[STORAGE_KEYS.DEMO_MODE] = 'kelurahan';
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.CURRENT_OFFICIAL, JSON.stringify(lurah));
+        localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(initialKelurahanProfile));
+        localStorage.setItem(STORAGE_KEYS.DEMO_MODE, 'kelurahan');
+
+        // Scoped datasets for Kelurahan Menteng Asri
+        localStorage.setItem(`${STORAGE_KEYS.PROFILE}_${kelCode}`, JSON.stringify(initialKelurahanProfile));
+        localStorage.setItem(`${STORAGE_KEYS.OFFICIALS_LIST}_${kelCode}`, JSON.stringify(initialKelurahanOfficials));
+        localStorage.setItem(`${STORAGE_KEYS.APBDES}_${kelCode}`, JSON.stringify(initialKelurahanApbdes));
+        localStorage.setItem(`${STORAGE_KEYS.NEIGHBORHOOD_UNITS}_${kelCode}`, JSON.stringify(initialKelurahanNeighborhoodUnits));
+
+        // Adapt citizens to Kelurahan Menteng Asri
+        const kelCitizens = initialCitizens.map((c, idx) => ({
+          ...c,
+          id: `kel-cit-${idx + 1}`,
+          dusun: idx % 2 === 0 ? 'Lingkungan Menteng Asri Barat' : 'Lingkungan Menteng Asri Timur',
+          alamat_lengkap: (c.alamat_lengkap || '').replace('Desa Sukamaju', 'Kelurahan Menteng Asri').replace('Kp.', 'Jl.'),
+          village_name: 'Kelurahan Menteng Asri',
+          village_code: '32.71.01.1001'
+        }));
+        localStorage.setItem(`${STORAGE_KEYS.CITIZENS}_${kelCode}`, JSON.stringify(kelCitizens));
+
+        // Adapt letters to Kelurahan Menteng Asri
+        const kelLetters = initialLetterRequests.map((l, idx) => ({
+          ...l,
+          id: `kel-ltr-${idx + 1}`,
+          citizen_address: (l.citizen_address || '').replace('Desa Sukamaju', 'Kelurahan Menteng Asri'),
+          signed_by_name: l.status === 'signed' ? 'Dr. Irwan Setiawan, M.Si.' : l.signed_by_name,
+          letter_official_number: l.letter_official_number
+            ? l.letter_official_number.replace('Kesra/IX/2026', 'Kel.MA/IX/2026')
+            : undefined,
+          timeline: l.timeline.map((t) => ({
+            ...t,
+            actor: t.actor === 'Ahmad Subarjo, S.Pd.' ? 'Dr. Irwan Setiawan, M.Si.' : t.actor
+          }))
+        }));
+        localStorage.setItem(`${STORAGE_KEYS.LETTERS}_${kelCode}`, JSON.stringify(kelLetters));
+
+        // Adapt complaints to Kelurahan Menteng Asri
+        const kelComplaints = initialComplaints.map((c, idx) => ({
+          ...c,
+          id: `kel-cmp-${idx + 1}`,
+          dusun: idx % 2 === 0 ? 'Lingkungan Menteng Asri Barat' : 'Lingkungan Menteng Asri Timur',
+          assigned_officer: c.assigned_officer ? 'Rian Pratama, S.STP.' : undefined
+        }));
+        localStorage.setItem(`${STORAGE_KEYS.COMPLAINTS}_${kelCode}`, JSON.stringify(kelComplaints));
+
+        // Adapt announcements
+        const kelAnnouncements = initialAnnouncements.map((a, idx) => ({
+          ...a,
+          id: `kel-ann-${idx + 1}`,
+          title: a.title.replace('Desa Sukamaju', 'Kelurahan Menteng Asri').replace('BLT-DD', 'Bantuan Sosial Kelurahan'),
+          content: a.content.replace(/Desa Sukamaju/g, 'Kelurahan Menteng Asri').replace(/Pemerintah Desa/g, 'Pihak Kelurahan')
+        }));
+        localStorage.setItem(`${STORAGE_KEYS.ANNOUNCEMENTS}_${kelCode}`, JSON.stringify(kelAnnouncements));
+      }
+
+      this.setActiveRole('kades'); // eksekutif utama (Lurah)
+    } else {
+      // mode === 'desa' (Desa Sukamaju)
+      const kades = initialVillageOfficials[0];
+      const desaCode = '320110102003';
+
+      this.cache[STORAGE_KEYS.CURRENT_OFFICIAL] = kades;
+      this.cache[STORAGE_KEYS.PROFILE] = initialVillageProfile;
+      this.cache[STORAGE_KEYS.DEMO_MODE] = 'desa';
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.CURRENT_OFFICIAL, JSON.stringify(kades));
+        localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(initialVillageProfile));
+        localStorage.setItem(STORAGE_KEYS.DEMO_MODE, 'desa');
+
+        localStorage.setItem(`${STORAGE_KEYS.PROFILE}_${desaCode}`, JSON.stringify(initialVillageProfile));
+        localStorage.setItem(`${STORAGE_KEYS.OFFICIALS_LIST}_${desaCode}`, JSON.stringify(initialVillageOfficials));
+        localStorage.setItem(`${STORAGE_KEYS.APBDES}_${desaCode}`, JSON.stringify(initialApbdes));
+        localStorage.setItem(`${STORAGE_KEYS.NEIGHBORHOOD_UNITS}_${desaCode}`, JSON.stringify(initialNeighborhoodUnits));
+        localStorage.setItem(`${STORAGE_KEYS.CITIZENS}_${desaCode}`, JSON.stringify(initialCitizens));
+        localStorage.setItem(`${STORAGE_KEYS.LETTERS}_${desaCode}`, JSON.stringify(initialLetterRequests));
+        localStorage.setItem(`${STORAGE_KEYS.COMPLAINTS}_${desaCode}`, JSON.stringify(initialComplaints));
+        localStorage.setItem(`${STORAGE_KEYS.ANNOUNCEMENTS}_${desaCode}`, JSON.stringify(initialAnnouncements));
+      }
+
+      this.setActiveRole('kades');
+    }
+
+    this.notify();
+  }
+
+  getDemoMode(): 'desa' | 'kelurahan' | null {
+    if (typeof localStorage === 'undefined') return null;
+    const mode = localStorage.getItem(STORAGE_KEYS.DEMO_MODE);
+    if (mode === 'desa' || mode === 'kelurahan') return mode;
+    return null;
+  }
+
+  resetDemoData(mode?: 'desa' | 'kelurahan') {
+    const currentMode = mode || this.getDemoMode() || 'desa';
+    this.loadDemoAccount(currentMode);
   }
 
   // Village Officials Management
@@ -2679,9 +2803,66 @@ class DataService {
     return updated;
   }
 
+  // Muat data simulasi percontohan super kaya ke desa / kelurahan aktif saat ini (untuk presentasi/demonstrasi)
+  seedShowcaseData() {
+    const official = this.getCurrentOfficial();
+    const profile = this.getVillageProfile();
+    const code = this.getActiveVillageCode() || '320110102003';
+    const vName = profile.name || official?.village_name || 'Desa Percontohan';
+    const isKel =
+      profile.village_type === 'kelurahan' ||
+      official?.village_type === 'kelurahan' ||
+      official?.role === 'lurah';
+
+    // Adapt citizens to this active village
+    const seededCitizens = initialCitizens.map((c, idx) => ({
+      ...c,
+      id: `seed-cit-${idx + 1}`,
+      alamat_lengkap: `${(c.alamat_lengkap || '').split(',')[0]}, ${vName}`,
+      village_name: vName,
+      village_code: profile.code || code
+    }));
+    this.setStorage(STORAGE_KEYS.CITIZENS, seededCitizens);
+
+    // Adapt letters to this active village
+    const seededLetters = initialLetterRequests.map((l, idx) => ({
+      ...l,
+      id: `seed-ltr-${idx + 1}`,
+      citizen_address: `${(l.citizen_address || '').split(',')[0]}, ${vName}`,
+      signed_by_name: official ? official.nama_lengkap : profile.kades_name || 'Kepala Desa'
+    }));
+    this.setStorage(STORAGE_KEYS.LETTERS, seededLetters);
+
+    // Adapt complaints
+    const seededComplaints = initialComplaints.map((c, idx) => ({
+      ...c,
+      id: `seed-cmp-${idx + 1}`,
+      location_address: `${(c.location_address || '').split(',')[0]}, ${vName}`
+    }));
+    this.setStorage(STORAGE_KEYS.COMPLAINTS, seededComplaints);
+
+    // APBDes / Anggaran
+    this.setStorage(STORAGE_KEYS.APBDES, isKel ? initialKelurahanApbdes : initialApbdes);
+
+    // Neighborhood units
+    const units = isKel ? initialKelurahanNeighborhoodUnits : initialNeighborhoodUnits;
+    this.setStorage(
+      STORAGE_KEYS.NEIGHBORHOOD_UNITS,
+      units.map((u) => ({ ...u, village_code: profile.code || code }))
+    );
+
+    this.notify();
+  }
+
   // Reset to initial mock data
   resetAllData() {
     this.cache = {};
+    const currentDemo = this.getDemoMode();
+    if (currentDemo) {
+      this.resetDemoData(currentDemo);
+      return;
+    }
+
     localStorage.removeItem(STORAGE_KEYS.CITIZENS);
     localStorage.removeItem(STORAGE_KEYS.LETTERS);
     localStorage.removeItem(STORAGE_KEYS.COMPLAINTS);

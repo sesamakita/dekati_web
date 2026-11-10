@@ -46,8 +46,19 @@ export const AuthView: React.FC<AuthViewProps> = ({
   onBackToLanding,
   initialMode = 'login',
 }) => {
-  const { profile, loginOfficial, registerOfficial } = useData();
-  const [authMode, setAuthMode] = useState<'login' | 'register'>(initialMode);
+  const { profile, loginOfficial, registerOfficial, loadDemoAccount } = useData();
+  const [authMode, setAuthMode] = useState<'login' | 'register'>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const hashQuery = window.location.hash.split('?')[1] || '';
+        const hashParams = new URLSearchParams(hashQuery);
+        const mode = urlParams.get('mode') || hashParams.get('mode');
+        if (mode === 'register' || mode === 'login') return mode;
+      } catch {}
+    }
+    return initialMode;
+  });
   const [showPassword, setShowPassword] = useState(false);
 
   // Login Form States
@@ -208,6 +219,12 @@ export const AuthView: React.FC<AuthViewProps> = ({
     if (regRole === 'kades' || regRole === 'lurah') {
       setRegRole(type === 'kelurahan' ? 'lurah' : 'kades');
     }
+  };
+
+  // Akses 1-Click Demo Interaktif (Versi Desa vs Kelurahan)
+  const handleQuickDemo = (mode: 'desa' | 'kelurahan') => {
+    loadDemoAccount(mode);
+    onLoginSuccess('kades', mode === 'kelurahan' ? 'lurah@mentengasri.kel.id' : 'kades@sukamaju.desa.id');
   };
 
   // Submit Login
@@ -582,6 +599,57 @@ export const AuthView: React.FC<AuthViewProps> = ({
                     )}
                   </button>
                 </form>
+
+                {/* 1-Click Interactive Demo Access for Prospective Users */}
+                <div className="pt-4 mt-2 border-t border-slate-200/80">
+                  <div className="bg-gradient-to-br from-indigo-50/80 via-sky-50/40 to-slate-50 border border-indigo-200/80 rounded-2xl p-4 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+                        <span className="text-xs font-extrabold text-slate-800">
+                          Jelajahi Demo Interaktif (1-Click)
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-600 text-white px-2 py-0.5 rounded-full shadow-xs">
+                        Tanpa Daftar
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+                      Tinjau langsung seluruh fitur web admin dengan data pelayanan, surat TTE, dan APBD yang terisi lengkap:
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleQuickDemo('desa')}
+                        className="p-2.5 rounded-xl bg-white hover:bg-emerald-50 text-slate-800 hover:text-emerald-900 border border-slate-200 hover:border-emerald-300 text-left transition-all group/demobtn shadow-xs cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold flex items-center gap-1.5">
+                            <span>🌾</span>
+                            <span>Versi Desa</span>
+                          </span>
+                          <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover/demobtn:text-emerald-600 group-hover/demobtn:translate-x-0.5 transition-all" />
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5 font-medium">Desa Sukamaju (APBDes &amp; Kades)</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleQuickDemo('kelurahan')}
+                        className="p-2.5 rounded-xl bg-white hover:bg-indigo-50 text-slate-800 hover:text-indigo-900 border border-slate-200 hover:border-indigo-300 text-left transition-all group/demobtn shadow-xs cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold flex items-center gap-1.5">
+                            <span>🏛️</span>
+                            <span>Versi Kelurahan</span>
+                          </span>
+                          <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover/demobtn:text-indigo-600 group-hover/demobtn:translate-x-0.5 transition-all" />
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5 font-medium">Kel. Menteng Asri (APBD &amp; Lurah)</div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1028,6 +1096,22 @@ export const AuthView: React.FC<AuthViewProps> = ({
                     )}
                   </button>
                 </form>
+
+                <div className="pt-3 text-center">
+                  <p className="text-xs text-slate-500 font-medium">
+                    Hanya ingin melihat-lihat tanpa mendaftar?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('login');
+                        setLoginError('');
+                      }}
+                      className="text-indigo-600 font-bold hover:underline cursor-pointer"
+                    >
+                      Jelajahi Demo Interaktif (1-Click)
+                    </button>
+                  </p>
+                </div>
               </div>
             )}
           </div>

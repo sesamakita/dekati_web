@@ -64,5 +64,9 @@ export function useData() {
     clearAuditLogs: dataService.clearAuditLogs.bind(dataService),
     syncFromSupabase: () => dataService.syncFromSupabase(),
     resetAllData: dataService.resetAllData.bind(dataService),
+    demoMode: dataService.getDemoMode(),
+    loadDemoAccount: dataService.loadDemoAccount.bind(dataService),
+    resetDemoData: dataService.resetDemoData.bind(dataService),
+    seedShowcaseData: dataService.seedShowcaseData.bind(dataService),
   };
 }
